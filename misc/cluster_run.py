@@ -67,7 +67,7 @@ seeds = [0]#,3,4,5]
 #             'base_seed_5'
 #             ]
 
-run_names=['4825']
+run_names=['shocks_0']
 # run_names=['shocks_0',
 #             'shocks_2',
 #             'shocks_5'
@@ -128,7 +128,7 @@ run_times=[
     ]
 
 
-def schedule_run(run_nb, flag, run_name, run_time, seed, r):
+def schedule_run(run_nb, flag, run_name, run_time, seed):
     if not flag:
         run_label = "run_%s" %(run_name)
         if os.path.exists(run_label):
@@ -168,8 +168,8 @@ def schedule_run(run_nb, flag, run_name, run_time, seed, r):
             "notification": "END,FAIL,TIME_LIMIT" if args.notify else "FAIL,TIME_LIMIT",
             "comment": "%s/%s" % (os.getcwd(), run_label),
             "environment": "ALL",
-            "executable": 'cluster_aggregation.py',
-            "options": " --seed %i --number %s "%(seed, int(r)),
+            "executable": 'cluster_sim.py',
+            "options": " --seed %i --run_name %s "%(seed, int(seed)),
             "num_threads": args.threads,
             "mem_per_cpu": args.mem_per_cpu if not args.largemem else 15360,   # if mem_per_cpu is larger than MaxMemPerCPU then num_threads is reduced
             "other": "" if args.largemem else ""
@@ -224,12 +224,12 @@ enum = 0
 print(seeds)
 
 for s, seed in enumerate(seeds):
-    for r, rr in enumerate(rs):
+    #for r, rr in enumerate(rs):
         #for n, name in enumerate(run_names):
         
-        schedule_run(run_nb=enum,flag=single, run_name=run_names[s], run_time=run_times[1], seed=seed, r=rr)
-        enum += 1
-        print(enum)
+    schedule_run(run_nb=enum,flag=single, run_name=run_names[s], run_time=run_times[1], seed=seed)
+    enum += 1
+    print(enum)
 
 if num > 1:
     print("Scheduled %s runs" % enum)
