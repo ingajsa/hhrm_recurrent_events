@@ -1,6 +1,9 @@
 # hhrm_recurrent_events
 
 ## General description
+
+This branch is for the further development.
+
 This model allows to simulate household recovery after recurrent extreme events.
 The model is forced by spatially explicit hazard data combined with household surveys. The model is described in:
 
@@ -17,3 +20,5 @@ sets the tax rate and records the national recovery process. The Household
 class simulates the recovery of each household instance. 
 The lifetime and action of the agents as well as the data storage is controlled in the class ClimateLife in hhwb/application/climate_life.py. Finally, the class DataAnalysis defined in hhwb/application/data_analysis.py is used to
 summarize household specific impact metrics.
+
+The folder local_dev contains the script for runs on a pc.
