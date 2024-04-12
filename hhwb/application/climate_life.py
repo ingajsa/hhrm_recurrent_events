@@ -51,19 +51,27 @@ class ClimateLife():
     
 
     @staticmethod
-    def update_reco(hh, gov, t_i, dt):
+    def update_reco(hh, gov):
         """update households recovery state"""
-        hh.update_reco(gov.L_t, gov.K, t_i, dt)
-        
+        hh.update_reco(gov.L_t, gov.L_pub_t, gov.K_pub, gov.K, gov.lmbda)
+
         return hh
     
     def __update_records(self, t_i):
         
-        keff = np.zeros((len(self.__hhs)))
+        kpub = np.zeros((len(self.__hhs)))
+        kpriv = np.zeros((len(self.__hhs)))
+        
+        ipub = np.zeros((len(self.__hhs)))
+        ipriv = np.zeros((len(self.__hhs)))
         inc = np.zeros((len(self.__hhs)))
         inc_sp = np.zeros((len(self.__hhs)))
+        
         cons = np.zeros((len(self.__hhs)))
+        cons_priv = np.zeros((len(self.__hhs)))
         cons_sm = np.zeros((len(self.__hhs)))
+        cons_priv_sm = np.zeros((len(self.__hhs)))
+        
         wb = np.zeros((len(self.__hhs)))
         wb_sm = np.zeros((len(self.__hhs)))
         sav = np.zeros((len(self.__hhs)))
@@ -71,17 +79,29 @@ class ClimateLife():
         for hh in self.__hhs:
 
             if t_i % TEMP_RES == 0:
-                keff[int(hh.hhid)] = hh.d_k_eff_t
+                kpub[int(hh.hhid)] = hh.d_k_pub_t
+                kpriv[int(hh.hhid)] = hh.d_k_priv_t
+                
+                ipub[int(hh.hhid)] = hh.d_inc_pub_t
+                ipriv[int(hh.hhid)] = hh.d_inc_priv_t
+                
                 inc[int(hh.hhid)] = hh.d_inc_t
                 inc_sp[int(hh.hhid)] = hh.d_inc_sp_t
-                cons[int(hh.hhid)]  = hh.d_con_t
-                wb[int(hh.hhid)] = hh.d_wb_t
-                wb_sm[int(hh.hhid)] = hh.wb_smooth
-                cons_sm[int(hh.hhid)] = hh.con_smooth
-                sav[int(hh.hhid)] = hh.savings
-            hh._t += hh._dt
+                
+                cons[int(hh.hhid)]  = hh.d_con_eff_t
+                cons_priv[int(hh.hhid)] = hh.d_con_priv_t
+                
+                cons_sm[int(hh.hhid)] = hh.d_con_eff_sm
+                cons_priv_sm[int(hh.hhid)] = hh.d_con_priv_sm
 
-        return keff, inc, inc_sp, cons, cons_sm, wb, wb_sm, sav
+                wb[int(hh.hhid)] = hh.d_wb_t
+                wb_sm[int(hh.hhid)] = hh.d_wb_sm
+                
+                sav[int(hh.hhid)] = hh.savings
+            hh.t += hh.dt
+        self.__gov.t+=self.__gov.dt
+
+        return kpub, kpriv, ipub, ipriv, inc, inc_sp, cons, cons_priv, cons_sm, cons_priv_sm, wb, wb_sm, sav
     
     
 
@@ -124,36 +144,56 @@ class ClimateLife():
         
         colnames = np.arange(len(self.__hhs)).astype(str)
         
-        k_eff = pd.DataFrame(columns=colnames)
+        keff = pd.DataFrame(columns=colnames)
+        kpub = pd.DataFrame(columns=colnames)
+        kpriv = pd.DataFrame(columns=colnames)
+        
+        ipub = pd.DataFrame(columns=colnames)
+        ipriv = pd.DataFrame(columns=colnames)
         inc_ =  pd.DataFrame(columns=colnames)
         inc_sp_ =  pd.DataFrame(columns=colnames)
         cons_ =  pd.DataFrame(columns=colnames)
+        cons_priv_ = pd.DataFrame(columns=colnames)
         cons_sm_ =  pd.DataFrame(columns=colnames)
+        cons_priv_sm_ =  pd.DataFrame(columns=colnames)
         wb_ =  pd.DataFrame(columns=colnames)
         wb_sm_ =  pd.DataFrame(columns=colnames)
         sav_ =  pd.DataFrame(columns=colnames)
-        gov_ =  pd.DataFrame(columns=['keff','inc', 'inc_sp', 'cons', 'cons_sm', 'wb', 'wb_sm'])
+        gov_ =  pd.DataFrame(columns=['kpub', 'kpriv', 'ipub', 'ipriv','inc', 'inc_sp', 'cons',
+                                      'cons_priv', 'cons_sm', 'cons_priv_sm', 'wb', 'wb_sm'])
         
-        k_eff.to_csv(work_path+result_path+'keff.csv')
+        keff.to_csv(work_path+result_path+'keff.csv')
+        kpub.to_csv(work_path+result_path+'kpub.csv')
+        kpriv.to_csv(work_path+result_path+'kpriv.csv')
+        
+        ipub.to_csv(work_path+result_path+'ipub.csv')
+        ipriv.to_csv(work_path+result_path+'ipriv.csv')
+        
         inc_.to_csv(work_path+result_path+'inc.csv')
         inc_sp_.to_csv(work_path+result_path+'inc_sp.csv')
         cons_.to_csv(work_path+result_path+'cons.csv')
+        cons_priv_.to_csv(work_path+result_path+'cons_priv.csv')
         cons_sm_.to_csv(work_path+result_path+'cons_sm.csv')
+        cons_priv_sm_.to_csv(work_path+result_path+'cons_priv_sm.csv')
         wb_.to_csv(work_path+result_path+'wb.csv')
         wb_sm_.to_csv(work_path+result_path+'wb_sm.csv')
         sav_.to_csv(work_path+result_path+'sav.csv')
         gov_.to_csv(work_path+result_path+'gov.csv')
         
-        for hh in self.__hhs:
-            print('Capital stock of HH ' + str(int(hh.hhid))+': '+str(hh.k_eff_0))
 
         n_shock = 0
         
         
         with open(work_path+result_path+'keff.csv', 'w', newline='') as f_keff,\
+             open(work_path+result_path+'kpub.csv', 'w', newline='') as f_kpub,\
+             open(work_path+result_path+'kpriv.csv', 'w', newline='') as f_kpriv,\
+             open(work_path+result_path+'cons_priv.csv', 'w', newline='') as f_cons_priv,\
+             open(work_path+result_path+'cons_priv_sm.csv', 'w', newline='') as f_cons_priv_sm,\
              open(work_path+result_path+'cons_sm.csv', 'w', newline='') as f_cons_sm,\
              open(work_path+result_path+'cons.csv', 'w', newline='') as f_cons,\
              open(work_path+result_path+'wb.csv', 'w', newline='') as f_wb,\
+             open(work_path+result_path+'ipub.csv', 'w', newline='') as f_ipub,\
+             open(work_path+result_path+'ipriv.csv', 'w', newline='') as f_ipriv,\
              open(work_path+result_path+'inc.csv', 'w', newline='') as f_inc,\
              open(work_path+result_path+'inc_sp.csv', 'w', newline='') as f_inc_sp,\
              open(work_path+result_path+'wb_sm.csv', 'w', newline='') as f_wb_sm,\
@@ -164,58 +204,89 @@ class ClimateLife():
                  # open(work_path+result_path+'cons.csv', 'w', newline='') as f_cons,\
                  
             writer_keff=csv.writer(f_keff, delimiter=',')
+            writer_kpub=csv.writer(f_kpub, delimiter=',')
+            writer_kpriv=csv.writer(f_kpriv, delimiter=',')
+            
+            writer_ipub=csv.writer(f_ipub, delimiter=',')
+            writer_ipriv=csv.writer(f_ipriv, delimiter=',')
+            
             writer_inc=csv.writer(f_inc, delimiter=',')
-            write_incsp=csv.writer(f_inc_sp, delimiter=',')
-            writer_cons=csv.writer(f_cons, delimiter=',')
-            writer_conssm=csv.writer(f_cons_sm, delimiter=',')
+            writer_incsp=csv.writer(f_inc_sp, delimiter=',')
+            
+            writer_cons = csv.writer(f_cons, delimiter=',')
+            writer_cons_sm = csv.writer(f_cons_sm, delimiter=',')
+            writer_cons_priv = csv.writer(f_cons_priv, delimiter=',')
+            writer_cons_priv_sm = csv.writer(f_cons_priv_sm, delimiter=',')
+            
             writer_wb=csv.writer(f_wb, delimiter=',')
             writer_wb_sm=csv.writer(f_wb_sm, delimiter=',')
             writer_sav=csv.writer(f_sav, delimiter=',')
             writer_gov=csv.writer(f_gov, delimiter=',')
             
             for t_i in self.__dt_life:
-    
                 print(t_i)
+                print(dt_reco)
     
                 if t_i in self.__shock.time_stemps:
                     print('shock start')
                     self.__hhs = self.__shock.shock(n_shock, self.__gov, self.__hhs, dt_reco, cores)
                     n_shock += 1
                     #dt_s = 0
-                self.__gov.update_reco(t_i, self.__hhs)
                 
-                if not t_i in self.__shock.time_stemps:
+                else:
+                    self.__gov.update_reco(self.__hhs)
                     p = mp.Pool(cores)
-                    prod_x=partial(ClimateLife.update_reco, gov=self.__gov, t_i=t_i, dt=dt_reco)
+                    prod_x=partial(ClimateLife.update_reco, gov=self.__gov)
                     self.__hhs=p.map(prod_x, self.__hhs)
                     p.close()
                     p.join()
+                    
+                self.__gov.collect_hh_info(t_i, self.__hhs)
     
-                keff, inc, inc_sp, cons, cons_sm, wb, wb_sm, sav = self.__update_records(t_i)
+                kpub, kpriv, ipub, ipriv, inc, inc_sp, cons, cons_priv, cons_sm, cons_priv_sm, wb, wb_sm, sav = self.__update_records(t_i)
                 
-                gov_res = [self.__gov.d_k_eff_t, self.__gov.d_inc_t, self.__gov.d_inc_sp_t,
-                           self.__gov.d_con_t, self.__gov.con_smooth, self.__gov.d_wb_t,
-                           self.__gov.wb_smooth]
                 
-                print(gov_res)
+                gov_res = [self.__gov.L_t, self.__gov.d_k_priv_t, self.__gov.L_pub_t, self.__gov.d_inc_t,
+                           self.__gov.d_inc_sp_t, self.__gov.d_con_priv_t, self.__gov.d_con_eff_t,
+                           self.__gov.d_con_eff_sm, self.__gov.d_con_priv_sm,
+                           self.__gov.d_wb_t, self.__gov.d_wb_sm]
+                
+                print(cons)
+                print(cons_priv)
+                
+                writer_keff.writerow(list(kpub+kpub))
 
-    
-
-                writer_keff.writerow(list(keff))
+                writer_kpub.writerow(list(kpub))
+                writer_kpriv.writerow(list(kpriv))
+                
+                writer_ipub.writerow(list(ipub))
+                writer_ipriv.writerow(list(ipriv))
+                
                 writer_inc.writerow(list(inc))
-                write_incsp.writerow(list(inc_sp))
+                writer_incsp.writerow(list(inc_sp))
+
                 writer_cons.writerow(list(cons))
-                writer_conssm.writerow(list(cons_sm))
+                
+                writer_cons_sm.writerow(list(cons_sm))
+                writer_cons_priv.writerow(list(cons_priv))
+                writer_cons_priv_sm.writerow(list(cons_priv_sm))
+                
                 writer_wb.writerow(list(wb))
                 writer_wb_sm.writerow(list(wb_sm))
                 writer_sav.writerow(list(sav))
                 writer_gov.writerow(gov_res)
             
             f_keff.close()
+            f_kpub.close()
+            f_kpriv.close()
+            f_ipub.close()
+            f_ipriv.close()
             f_inc.close()
             f_inc_sp.close()
             f_cons.close()
+            f_cons_priv.close()
             f_cons_sm.close()
+            f_cons_priv_sm.close()
             f_wb.close()
             f_wb_sm.close()
             f_sav.close()

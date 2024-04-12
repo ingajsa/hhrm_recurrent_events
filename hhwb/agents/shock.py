@@ -10,10 +10,10 @@ import random
 import numpy as np
 import pandas as pd
 import multiprocessing as mp
-from hhwb.agents.agent import Agent
 from functools import partial
 from hhwb.util.constants import  DT_STEP, RECO_PERIOD
 from datetime import datetime, date
+from zipfile import ZipFile 
 
 
 AGENT_TYPE = 'SH'
@@ -42,7 +42,7 @@ REGIONS = list(REGION_DICT)
 
 
 
-class Shock(Agent):
+class Shock():
     """Shock definition. This class builds the intersection with the hazard forcing and provides direct
        damage obtained from hazard forcing and the affected households.
 
@@ -83,23 +83,27 @@ class Shock(Agent):
         return self.__dt
     
     @staticmethod
-    def apply_shock(hh, L, K, dt_reco, affected_hhs):
+    def apply_shock(hh, L, K, L_pub, dt_reco, affected_hhs):
         """wrapper function for the shocking"""
 
         if hh.hhid in affected_hhs:
-            hh.shock(aff_flag=True, L=L, K=K, dt=dt_reco)
+            hh.shock(aff_flag=True, L_pub=L_pub, L=L, K=K, dt=dt_reco)
         else:
-            hh.shock(aff_flag=False, L=L, K=K, dt=dt_reco)
+            hh.shock(aff_flag=False, L_pub=L_pub, L=L, K=K, dt=dt_reco)
         return hh
     
     def read_shock(self, work_path, path, event_identifier,run):
         
         """this is a function that only reads already preprocessed shock data (households - events)
            """
+           
+        with ZipFile(work_path + path, 'r') as zip_ref:
+            # Extract the CSV file to a temporary directory
+            zip_ref.extract('test_shocks.csv', path='temp')
         
         shock_data = pd.read_csv(work_path + path)
         
-        start_date = date(2002,1,1)
+        start_date = date(2008,1,1)
         
         event_names = [col for col in shock_data.columns if event_identifier in col]
         
@@ -128,7 +132,7 @@ class Shock(Agent):
         """Some events are aggregated as they fall within the same time step of the model and are
         treated as one event, this aggregation is saved here"""
         
-        shock_df.to_csv('shocks_aggregated_{}.csv'.format(run))
+        shock_df.to_csv('shocks_aggregated.csv')
         #shock_df.to_csv(work_path + '/data/output/shocks/shocks_syn_aggregated.csv')
         
         return
@@ -147,15 +151,22 @@ class Shock(Agent):
         """
         
         affected_hhs = np.where(self.__aff_ids[:, event_index]==1)[0]
-        L_t = 0
-        p = mp.Pool(cores)
+        L_t = 0.
+        L_pub_t = 0.
+        
         for h_ind, hh in enumerate(hhs):
             if hh.hhid in affected_hhs:
-                L_t += hh.vul * (hh.k_eff_0 - hh.d_k_eff_t)
-            else:
-                L_t += hh.d_k_eff_t
                 
-        prod_x = partial(Shock.apply_shock, L=L_t, K=gov.K, dt_reco=dt_reco, affected_hhs=affected_hhs)
+                L_pub_t += hh.vul * (hh.k_pub_0 - hh.d_k_pub_t)
+                L_t += hh.vul * ((hh.k_pub_0 - hh.d_k_pub_t) + (hh.k_priv_0 - hh.d_k_priv_t))
+            else:
+                
+                L_pub_t += hh.d_k_pub_t
+                L_t += hh.d_k_priv_t + hh.d_k_pub_t
+                
+        gov.shock(aff_flag=True, L=L_t, L_pub=L_pub_t, dt=dt_reco)
+        p = mp.Pool(cores)       
+        prod_x = partial(Shock.apply_shock, L=L_t, K=gov.K,L_pub=L_pub_t, dt_reco=dt_reco, affected_hhs=affected_hhs)
         
         hhs = p.map(prod_x, hhs)
         p.close()
@@ -167,7 +178,7 @@ class Shock(Agent):
         #     else:
         #         hh.shock(aff_flag=False, L=L_t, K=gov.K, dt=dt_reco)
 
-        gov.shock(aff_flag=True, L=L_t)
+        
 
         return hhs
 

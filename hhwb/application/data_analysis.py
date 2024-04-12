@@ -15,14 +15,7 @@ class DataAnalysis():
         self.__output_data_path = output_data_path
         self.__survey_data_path = survey_data_path
         self.__hhs = pd.read_csv(self.__survey_data_path)
-        self.__shocks = pd.read_csv(shock_data_path)
-        del_cols = [col for col in self.__shocks.columns if 'Unnamed' in col]
-        self.__shocks = self.__shocks.drop(columns=del_cols)
-        self.__shocks['fhhid'] = self.__shocks.index
-        self.__shocks['n_events'] = self.__shocks.iloc[:,:-2].sum(axis=1)
-        self.__hhs['n_events']= self.__shocks['n_events']
-        self.__hhs['hh_weight']= self.__hhs['weight']/self.__hhs['n_individuals']
-        self.__column_id = column_id
+
         self.__run_name = run_name
         
     def analyse_time(self, step=10000,name='moj'):
