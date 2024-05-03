@@ -53,7 +53,7 @@ class ClimateLife():
     @staticmethod
     def update_reco(hh, gov):
         """update households recovery state"""
-        hh.update_reco(gov.L_t, gov.L_pub_t, gov.K_pub, gov.K, gov.lmbda)
+        hh.update_reco(gov.L_t, gov.L_pub_t, gov.K_pub, gov.K)
 
         return hh
     
@@ -249,7 +249,7 @@ class ClimateLife():
                 gov_res = [self.__gov.L_t, self.__gov.d_k_priv_t, self.__gov.L_pub_t, self.__gov.d_inc_t,
                            self.__gov.d_inc_sp_t, self.__gov.d_con_priv_t, self.__gov.d_con_eff_t,
                            self.__gov.d_con_eff_sm, self.__gov.d_con_priv_sm,
-                           self.__gov.d_wb_t, self.__gov.d_wb_sm]
+                           self.__gov.d_wb_t, self.__gov.d_wb_sm, self.__gov.pub_debt]
                 
                 print(cons)
                 print(cons_priv)

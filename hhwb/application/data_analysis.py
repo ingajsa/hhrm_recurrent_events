@@ -7,18 +7,26 @@ Created on Fri Jan 28 19:31:24 2022
 """
 import numpy as np
 import pandas as pd
+from zipfile import ZipFile 
 
 class DataAnalysis():
     
     def __init__(self, survey_data_path='', shock_data_path='', output_data_path='', column_id='', run_name=''):
 
         self.__output_data_path = output_data_path
-        self.__survey_data_path = survey_data_path
-        self.__hhs = pd.read_csv(self.__survey_data_path)
+
+        
+        with ZipFile(survey_data_path, 'r') as zip_ref:
+            # Extract the CSV file to a temporary directory
+            zip_ref.extract('test_hh.csv', path='temp')
+        
+
+        self.__hhs = pd.read_csv('temp/' + 'test_hh.csv')
 
         self.__run_name = run_name
+        self.__column_id = column_id
         
-    def analyse_time(self, step=10000,name='moj'):
+    def analyse_time(self, step=1000,name='moj'):
         """ Calculates time under subsistence line and income and consumption losses"""      
         col=0
         add=step
@@ -54,7 +62,7 @@ class DataAnalysis():
         self.__hhs.to_csv('survey_'+self.__run_name+'_analysed.csv')
         #self.__hhs.to_csv(self.__output_data_path+name)
         
-    def analyse_wb(self, step=20000):
+    def analyse_wb(self, step=1000):
         """ Calculates well-being loss for all households"""
         
         col=0

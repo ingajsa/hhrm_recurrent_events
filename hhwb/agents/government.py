@@ -20,6 +20,7 @@ ETA=pams['ETA'].values[0]
 SUBS_SAV_RATE=pams['SUBS_SAV_RATE'].values[0]/13.
 T_RNG=pams['T_RNG'].values[0]
 K_PUB=pams['K_PUB'].values[0]
+PDS=pams['PDS'].values[0]
 
 class Government():
 
@@ -82,6 +83,8 @@ class Government():
         self.__c_shock = 0
         
         self.__aff = []
+        
+        self.__pub_debt = 0.
 
 
 
@@ -160,6 +163,10 @@ class Government():
     @property
     def d_wb_sm(self):
         return self.__d_wb_sm
+    
+    @property
+    def pub_debt(self):
+        return self.__pub_debt
     
 
 
@@ -315,6 +322,8 @@ class Government():
             self.__d_k_eff_t = L
             self.__d_k_pub_t = L_pub
             self.__d_k_priv_t = L - L_pub
+            self.__add_pds_expenditure()
+            
         else:
             self.__d_k_eff_t = 0
             
@@ -338,6 +347,13 @@ class Government():
         print('lmbda public capital stock')
         print(self.__lmbda)
 
+        return
+    
+    def __add_pds_expenditure(self):
+        
+        if PDS=='k_priv':
+            self.__pub_debt += self.__d_k_priv_t
+            
         return
     
     def __optimize_reco(self, vul=0.3):
@@ -454,7 +470,8 @@ class Government():
 
         """
         
-        self.__d_k_pub_t -=self.__get_reco_fee()
+        self.__d_k_pub_t -= self.__get_reco_fee()
+        self.__pub_debt += self.__get_reco_fee()
             
         
         

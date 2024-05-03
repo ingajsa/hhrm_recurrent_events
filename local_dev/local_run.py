@@ -9,7 +9,8 @@ import sys
 import os
 import inspect
 import pandas as pd
-
+import numpy as np
+from hhwb.util.constants import  DT_STEP, TEMP_RES, DT, OPT_DYN, RHO
 
 run_type='test'
 
@@ -17,16 +18,16 @@ run_type='test'
 run_time=10
 
 #eta parameter in well-being
-eta=1.5
+ETA=1.5
 
 #level of subsistence line
 subsistence_line=15926
 
 # time horizon of optimization
-t_rng= 15
+T_RNG= 15
 
 # productivity of capital stock
-pi=0.33
+PI=0.33
 
 # r minimum recovery_rate
 R = 3339
@@ -34,19 +35,31 @@ R = 3339
 # r minimum recovery_rate
 k_pub = 0.25
 
+pds=None #'k_priv'
+
+bbb_type= 'bbb' # bbb or sf or combined
+
+bbb_factor=0.5#'bbb'
+
+sf_factor=None#1.5
+
 
 """save configuration of the run"""
 
 dirc=os.getcwd()
 
-params=pd.DataFrame(data={'PI':pi,
-                 'ETA':eta,
-                 'SUBS_SAV_RATE':R,
-                 'T_RNG':t_rng,
-                 'K_PUB':k_pub,
-                 'SUBSISTENCE_LINE':subsistence_line}, index=[0])
+# params=pd.DataFrame(data={'PI':pi,
+#                  'ETA':eta,
+#                  'SUBS_SAV_RATE':R,
+#                  'T_RNG':t_rng,
+#                  'K_PUB':k_pub,
+#                  'PDS': pds,
+#                  'BBB_TYPE':bbb_type,
+#                  'BBB_FACTOR':bbb_factor,
+#                  'SF_FACTOR':sf_factor,
+#                  'SUBSISTENCE_LINE':subsistence_line}, index=[0])
 
-params.to_csv('params.csv')
+#params.to_csv('params.csv')
 
 from hhwb.agents.government import Government
 from hhwb.agents.hh_register import HHRegister
@@ -66,6 +79,7 @@ from hhwb.application.data_analysis import DataAnalysis
        - running the dynamic model
        - short analysis of the data
 """
+
 
 
 
@@ -91,11 +105,16 @@ hh_reg.set_from_csv(work_path=work_path, path=hh_path, id_col='fhhid', n_ind = '
                       vul_col='vul', income_col='income', income_sp='income_sp', region='region',
                       decile='decile', savings='savings', subsistence_line=subsistence_line,
                       ispoor='ispoor', isurban='isurban')
-
-# # print('Households registered')
-# # ## get number of registered households
+# print('Households registered')
+## get number of registered households
 
 all_hhs = hh_reg.hh_list
+
+hh=all_hhs[0]
+
+
+
+
 
 """ set up of the government agent """
 
@@ -131,9 +150,9 @@ cl.start(work_path='', result_path='',
 
 
 
-da=DataAnalysis(hh_path, shock_path, output_data_path='', column_id='', run_name=run_type)
+da=DataAnalysis(work_path+hh_path, shock_path, output_data_path='', column_id='', run_name=run_type)
 
-da.analyse_time(step=10000)
-da.analyse_wb(step=20000)
+da.analyse_time(step=1000)
+da.analyse_wb(step=1000)
 
 #da.analyse_time_steps(step=10000)

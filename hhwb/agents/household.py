@@ -10,7 +10,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 #from misc.util.constants_adapt import PI, ETA, SUBS_SAV_RATE
-from hhwb.util.constants import  DT_STEP, TEMP_RES, DT, OPT_DYN, RHO
+from hhwb.util.constants import  DT_STEP, TEMP_RES, DT, RHO
+
+OPT_DYN=True
 
 pams= pd.read_csv('params.csv')
 
@@ -19,6 +21,10 @@ ETA=pams['ETA'].values[0]
 SUBS_SAV_RATE=pams['SUBS_SAV_RATE'].values[0]/13.
 T_RNG=pams['T_RNG'].values[0]
 K_PUB=pams['K_PUB'].values[0]
+PDS=pams['PDS'].values[0]
+BBB_TYPE=pams['BBB_TYPE'].values[0]
+BBB_FACTOR=pams['BBB_FACTOR'].values[0]
+SF_FACTOR=pams['SF_FACTOR'].values[0]
 
 AGENT_TYPE = 'HH'
 
@@ -280,7 +286,7 @@ class Household():
         """
         return
 
-    def update_reco(self, L_t=None, L_pub=None, K_pub=None, K=None, gov_lmbda=None):
+    def update_reco(self, L_t=None, L_pub=None, K_pub=None, K=None):
         """
         Parameters
         ----------
@@ -359,13 +365,16 @@ class Household():
         """
         #print(self.__hhid)
         if aff_flag:
+            if self.__c_shock>1:
+                self.__adjust_vul_bbb()
             
-            if (self.__k_priv_0 - self.__d_k_priv_t) > 0.0:
+            if self.__k_priv_0 - self.__d_k_priv_t  > 0.0:
                 self.t = 0.
-                #self.__d_k_eff_t += (self.__k_eff_0 - self.__d_k_eff_t) * self.__vul
+                self.__d_k_eff_t += (self.__k_eff_0 - self.__d_k_eff_t) * self.__vul
                 self.__d_k_priv_t += (self.__k_priv_0 - self.__d_k_priv_t) * self.__vul
                 self.__d_k_pub_t += (self.__k_pub_0 - self.__d_k_pub_t) * self.__vul
-                
+                self.__set_pds()
+
                 opt_vul = self.__d_k_priv_t / self.__k_priv_0
                 
                 self.__share_pub_dam=self.__d_k_pub_t/L_pub
@@ -375,7 +384,9 @@ class Household():
                 
                 self.__damage_priv.append(self.__d_k_priv_t)
                 self.__damage_pub.append(self.__d_k_pub_t)
-                self.__optimize_reco(vul=opt_vul)
+                self.__get_reco_from_lookup(vul=opt_vul)
+                #self.__optimize_reco(vul=opt_vul)
+                    
                 
             else:
                 #self.__poverty_trap = True
@@ -403,7 +414,7 @@ class Household():
                 #self.__cnt_ts += 1
                 self.__d_con_priv_t = self.__d_inc_priv_t + self.__recovery_spending
                 self.__d_con_eff_t = self.__d_inc_t + self.__recovery_spending
-                self.__smooth_with_savings_1()
+                self.__smooth_with_savings_2()
                 self.__d_con_priv_sm = self.__floor
                 self.__d_con_eff_sm = self.__floor + self.__d_inc_sp_t + self.__d_inc_pub_t
                 self.__update_savings()
@@ -440,10 +451,44 @@ class Household():
                 print('share of public damage background shock')
                 print(self.__share_pub_dam)
             self.update_reco(L_t=L,L_pub=L_pub, K=K)
-            
-            
  
         return
+    
+    def __set_pds(self):
+        
+        if PDS=='k_priv':
+            self.__sav_t += (self.__k_priv_0 - self.__d_k_priv_t) * self.__vul
+            
+        return
+    
+    def __adjust_vul_bbb(self):
+        
+        recovery_state= ((self.__k_priv_0 - self.__d_k_priv_t) + (self.__k_pub_0 - self.__d_k_pub_t))/self.__k_eff_0
+        
+
+        
+        if (BBB_TYPE == 'bbb') | (BBB_TYPE == 'combined'):
+        
+            if recovery_state>= 0.9:
+                
+                self.__vul = BBB_FACTOR * self.__vul
+            
+        
+        if (BBB_TYPE == 'sf') | (BBB_TYPE == 'combined'):
+            
+            if recovery_state< 0.9:
+                
+                self.__vul = SF_FACTOR * self.__vul
+                
+                if self.__vul> 0.95:
+                    
+                    self.__vul=0.95   
+            
+        return
+                
+            
+        
+        
 
     def __get_reco_fee(self, t1=None, t2=None):
         """
@@ -459,9 +504,15 @@ class Household():
         if not t2:
             t2 = self.t + self.dt
             
+        try:
+            
 
-        dam_0 = self.__damage_priv[self.__c_shock] * np.e**(-t1*self.__lmbda[self.__c_shock])
-        dam_1 = self.__damage_priv[self.__c_shock] * np.e**(-t2*self.__lmbda[self.__c_shock])
+            dam_0 = self.__damage_priv[self.__c_shock] * np.e**(-t1*self.__lmbda[self.__c_shock])
+            dam_1 = self.__damage_priv[self.__c_shock] * np.e**(-t2*self.__lmbda[self.__c_shock])
+        
+        except IndexError:
+            print(self.__hhid)
+            print(self.__recovery_type)
         
         return dam_0-dam_1
     
@@ -569,14 +620,17 @@ class Household():
             # only use this for an optimization in each timestep
             if OPT_DYN:
                 opt_vul = self.__d_k_priv_t / self.__k_priv_0
+
                 self.t = 0.
                 del self.__lmbda[-1]
-                self.__optimize_reco(vul=opt_vul)
+                self.__get_reco_from_lookup(vul=opt_vul)
+                #self.__optimize_reco(vul=opt_vul)
                 self.__cnt_ts += 1
                 del self.__damage_priv[-1]
                 self.__damage_priv.append(self.__d_k_priv_t)
                 self.__recovery_spending = self.__get_reco_fee()
-                self.__smooth_with_savings_1()
+                self.__smooth_with_savings_2()
+
             else:
                 # get recovery spending
                 self.__recovery_spending = self.__get_reco_fee()
@@ -588,7 +642,8 @@ class Household():
 
             opt_vul = self.__d_k_priv_t / self.__k_priv_0
             del self.__lmbda[-1]
-            self.__optimize_reco(vul=opt_vul)
+            #self.__optimize_reco(vul=opt_vul)
+            self.__get_reco_from_lookup(vul=opt_vul)
             del self.__damage_priv[-1]
             self.__damage_priv.append(self.__d_k_priv_t)
             self.t = 0.
@@ -598,7 +653,7 @@ class Household():
             if self.__check_subs(optimal_recovery_spending) > 0:
                 # enter exponential recovery track
                 self.__recovery_type = 1
-                self.__smooth_with_savings_1()
+                self.__smooth_with_savings_2()
                 self.__recovery_spending = optimal_recovery_spending
                 self.__d_con_priv_sm = self.__floor 
                 self.__d_con_eff_sm = self.__floor + self.__d_inc_sp_t + self.__d_inc_pub_t
@@ -958,8 +1013,7 @@ class Household():
     def __smooth_with_savings_2(self):
         """Sets the floor taken from savings to smoothen HH's consumption
         loss and the time tf when it runs out of savings under recovery mode 2
-        """
-        
+        """       
 
         # check whether there are savings available 
         if self.__sav_t <= 0:
@@ -969,7 +1023,11 @@ class Household():
 
         dc0 = self.__d_con_priv_t
         
-        reco_spend=self.__recovery_spending - SUBS_SAV_RATE
+        if self.__recovery_type==1:
+            reco_spend=self.__recovery_spending
+        else:
+        
+            reco_spend=self.__recovery_spending - SUBS_SAV_RATE
         
         f_1 = dc0 + np.sqrt(2 * self.__sav_t*reco_spend/DT_STEP*PI*(1-self.__tax_rate))
 
@@ -1023,8 +1081,6 @@ class Household():
         
         self.__floor=f+(SUBS_SAV_RATE/DT_STEP)/2.
 
-        
-
         self.__tf = (dc0 - self.__floor)/(SUBS_SAV_RATE*PI*(1-self.__tax_rate))
 
         if self.__floor < 0:
@@ -1032,7 +1088,24 @@ class Household():
             self.__tf = (dc0 - self.__floor)/(SUBS_SAV_RATE*PI*(1-self.__tax_rate))
             
         return
+    
+    
+    def __get_reco_from_lookup(self, vul):
+        
+        lambdas= pd.read_csv('../data/data_lookup/lambdas.csv')
+        
+        if vul < 0.001:
+            vul=0.001
+        
+        try:
 
+            self.__lmbda.append(lambdas.loc[np.round(lambdas['vul'],3)==np.round(vul,3),'lmbda'].values[0])
+            
+        except IndexError:
+            
+            print(np.round(vul,3))
+        
+        return 
 
 
     def __optimize_reco(self, vul=0.3):
