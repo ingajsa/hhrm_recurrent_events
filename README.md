@@ -4,7 +4,7 @@
 This model allows to simulate household recovery after recurrent extreme events.
 The model is forced by spatially explicit hazard data combined with household surveys. The model is described in:
 
-https://doi.org/10.21203/rs.3.rs-2911340/v1
+Sauer, Inga and Walsh, Brian James and Frieler, Katja and Bresch, David N. and Otto, Christian, Understanding the Distributional Effects of Recurrent Floods in the Philippines (May 27, 2024). Available at SSRN: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4843542
 
 The forcing needs to be generated in a preprocessing step in hhwb/util.
 The scripts in the misc folder set up the runs for cluster simulations.
