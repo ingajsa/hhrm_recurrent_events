@@ -233,7 +233,7 @@ class Government():
     
     def update_reco(self, hh_reg= None):
         
-        self.__update_k_pub(hh_reg)
+        self.__update_k_pub()
 
         return
         
@@ -312,7 +312,6 @@ class Government():
             Total national capital stock. The default is 0.
         aff_flag: bool
             indicates whether agent is shocked.
-        
         """
         #self._dt = dt
 
@@ -341,8 +340,8 @@ class Government():
         
         print('opt_vul public capital stock')
         print(opt_vul)
-        
-        self.__optimize_reco(vul=opt_vul)
+
+        self.__get_reco_from_lookup(vul=opt_vul)
         
         print('lmbda public capital stock')
         print(self.__lmbda)
@@ -464,18 +463,37 @@ class Government():
         
         return dam_0-dam_1
     
-    def __update_k_pub(self, reg_hh):
+    def __update_k_pub(self):
         """
         Updates capital stock damage.
 
         """
         
+        opt_vul = self.__d_k_pub_t/self.__K_pub
+        
+        self.__get_reco_from_lookup(opt_vul)
+        
         self.__d_k_pub_t -= self.__get_reco_fee()
         self.__pub_debt += self.__get_reco_fee()
-            
-        
         
         return
+    
+    def __get_reco_from_lookup(self, vul):
+        
+        lambdas= pd.read_csv('../data/data_lookup/lambdas.csv')
+        
+        if vul < 0.001:
+            vul=0.001
+        
+        try:
+
+            self.__lmbda.append(lambdas.loc[np.round(lambdas['vul'],3)==np.round(vul,3),'lmbda'].values[0])
+            
+        except IndexError:
+            
+            print(np.round(vul,3))
+        
+        return 
 
     # def _update_income_sp(self):
     #     self.__d_inc_sp_t = (self.__d_k_eff_t/self.__K) * self.__sp_cost
