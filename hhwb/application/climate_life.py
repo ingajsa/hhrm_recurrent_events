@@ -251,9 +251,7 @@ class ClimateLife():
                            self.__gov.d_con_eff_sm, self.__gov.d_con_priv_sm,
                            self.__gov.d_wb_t, self.__gov.d_wb_sm, self.__gov.pub_debt]
                 
-                print(cons)
-                print(cons_priv)
-                
+
                 writer_keff.writerow(list(kpub+kpub))
 
                 writer_kpub.writerow(list(kpub))

@@ -201,12 +201,6 @@ class Government():
         self.__K_pub=K_PUB * self.__K
         self.__K_priv=(1-K_PUB) * self.__K
         
-        print('Tax rate:' + str(self.__K_priv))
-        print(self.__tax_rate)
-        print('Private capital stock Government:' + str(self.__K_priv))
-        print('Private capital stock Households:' + str(k_priv))
-        print('Public capital stock Government:' + str(self.__K_pub))
-        print('Public capital stock Households:' + str(k_pub))
         
         
         return
@@ -337,14 +331,11 @@ class Government():
         self.__d_inc_sp_t = (L/self.__K) * self.__sp_cost
         self.__d_inc_t = PI * L + self.__d_inc_sp_t
         self.__d_con_eff_t = np.nan
-        
-        print('opt_vul public capital stock')
-        print(opt_vul)
+
 
         self.__get_reco_from_lookup(vul=opt_vul)
         
-        print('lmbda public capital stock')
-        print(self.__lmbda)
+
 
         return
     
