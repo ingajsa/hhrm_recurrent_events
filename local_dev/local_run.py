@@ -37,9 +37,9 @@ k_pub = 0.25
 
 pds=None #'k_priv'
 
-bbb_type= 'bbb' # bbb or sf or combined
+bbb_type= None # bbb or sf or combined
 
-bbb_factor=0.5#'bbb'
+bbb_factor=None#'bbb'
 
 sf_factor=None#1.5
 
@@ -48,18 +48,18 @@ sf_factor=None#1.5
 
 dirc=os.getcwd()
 
-# params=pd.DataFrame(data={'PI':pi,
-#                  'ETA':eta,
-#                  'SUBS_SAV_RATE':R,
-#                  'T_RNG':t_rng,
-#                  'K_PUB':k_pub,
-#                  'PDS': pds,
-#                  'BBB_TYPE':bbb_type,
-#                  'BBB_FACTOR':bbb_factor,
-#                  'SF_FACTOR':sf_factor,
-#                  'SUBSISTENCE_LINE':subsistence_line}, index=[0])
+params=pd.DataFrame(data={'PI':PI,
+                  'ETA':ETA,
+                  'SUBS_SAV_RATE':R,
+                  'T_RNG':T_RNG,
+                  'K_PUB':k_pub,
+                  'PDS': pds,
+                  'BBB_TYPE':bbb_type,
+                  'BBB_FACTOR':bbb_factor,
+                  'SF_FACTOR':sf_factor,
+                  'SUBSISTENCE_LINE':subsistence_line}, index=[0])
 
-#params.to_csv('params.csv')
+params.to_csv('params.csv')
 
 from hhwb.agents.government import Government
 from hhwb.agents.hh_register import HHRegister
