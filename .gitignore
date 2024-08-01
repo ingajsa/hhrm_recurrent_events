@@ -10,3 +10,6 @@ data/test_hh/*.csv
 
 # Ignore all .csv files
 data/test_shocks/*.csv
+
+# Ignore pycache
+**/__pycache
