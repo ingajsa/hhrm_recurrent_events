@@ -12,4 +12,4 @@ data/test_hh/*.csv
 data/test_shocks/*.csv
 
 # Ignore pycache
-**/__pycache
+**/__pycache__
