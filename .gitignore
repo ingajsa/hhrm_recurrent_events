@@ -1,0 +1,15 @@
+
+# Ignore all csv files in local_dev
+local_dev/*.csv
+
+# ignore data/test_output/
+data/test_output/
+
+# Ignore all .csv files in test_hh
+data/test_hh/*.csv
+
+# Ignore all .csv files
+data/test_shocks/*.csv
+
+# Ignore pycache
+**/__pycache__

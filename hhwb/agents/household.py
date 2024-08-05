@@ -8,9 +8,11 @@ Created on Fri Mar 13 21:48:03 2020
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from hhwb.agents.agent import Agent
+
 #from misc.util.constants_adapt import PI, ETA, SUBS_SAV_RATE
-from hhwb.util.constants import  DT_STEP, TEMP_RES, DT, OPT_DYN, RHO
+from hhwb.util.constants import  DT_STEP, TEMP_RES, DT, RHO
+
+OPT_DYN=True
 
 pams= pd.read_csv('params.csv')
 
@@ -18,12 +20,16 @@ PI = pams['PI'].values[0]
 ETA=pams['ETA'].values[0]
 SUBS_SAV_RATE=pams['SUBS_SAV_RATE'].values[0]/13.
 T_RNG=pams['T_RNG'].values[0]
-
+K_PUB=pams['K_PUB'].values[0]
+PDS=pams['PDS'].values[0]
+BBB_TYPE=pams['BBB_TYPE'].values[0]
+BBB_FACTOR=pams['BBB_FACTOR'].values[0]
+SF_FACTOR=pams['SF_FACTOR'].values[0]
 
 AGENT_TYPE = 'HH'
 
 
-class Household(Agent):
+class Household():
     """! Household definition. Computed from the FIES and interacts with the classes
     Government and Shock.
     Attributes:
@@ -56,7 +62,6 @@ class Household(Agent):
         @param con_smooth (float): smoothed consumption at timestep t
         @param wb_smooth (float): wellbeing at timestep t (smoothed consumption)
         @param lmbda: optimal reconstruction rate
-        @param tau: time needed to achieve 95% recovery
         @param sav_t: savings left at timestep
         @param wb_0: wellbeing under unperturbed path
         @param wb_t: wellbeing under recovery path
@@ -69,43 +74,55 @@ class Household(Agent):
                  savings=0., subsistence_line=0., decile=None, isurban=1, ispoor=0):
         """! constructor"""
 
-        Agent.__init__(self, AGENT_TYPE)
         #  Attributes set during initialisation
-        self.__lmbda = [1.]
-        self.__tau = []
+        self.dt = 0.
+        self.t = 0.
 
         self.__hhid = hhid
         self.__n_inds = n_inds
         self.__weight = w
-        self._vul = vul
-        self.__inc_0 = i_0
-        self.__inc_sp = i_sp
-        self.__con_0 = i_0/DT_STEP
-        self.__sav_0 = savings
-        self.__sav_t = savings
+        self.__vul = vul
+        self.__share_pub_dam=0.
+        
         self.__subsistence_line = subsistence_line/DT_STEP
         self.__decile = decile
         self.__region = region
         self.__isurban = isurban
         self.__ispoor = ispoor
-        self.__recovery_type = 0
-        self.__poverty_trap = False
-        self.__recovery_spending = 0.
-        self.__con_smooth = 0
-        
-        self.__tf = -0.01
-        self.__floor = 0.
+        self.__rebuild = 0.
+
 
         self.__k_eff_0 = None
-        self.__twb = 0.
+        self.__d_k_eff_t = 0.
+        self.__d_k_pub_t = 0.
+        self.__d_k_priv_t = 0.
+        
+        self.__con_0 = i_0/DT_STEP
+        self.__inc_0 = i_0
+        self.__inc_sp = i_sp
+        self.__d_inc_sp_t = 0.
+        self.__d_inc_t = 0.
+        
+
+        self.__d_con_eff_t = 0.
+        self.__d_con_pub_t = 0.
+        self.__d_con_priv_t = 0.
+        self.__d_con_sp_t = 0.
+        self.__d_con_reco_t = 0.
+        self.__d_con_eff_sm = 0.
+        self.__d_con_priv_sm = 0.
+        
         self.__wb_0 = 0.
         self.__wb_t = 0.
-        self.__con_smooth = 0.
-        self.__wb_smooth = 0.
         self.__wb_0_sm = 0.
         self.__wb_t_sm = 0.
-        self.__wbls = 0.
-        self.__cnt_ts = 0
+        self.__d_wb_t = 0.
+        self.__d_wb_sm = 0.
+        
+        self.__sav_0 = savings
+        self.__sav_t = savings
+
+        
 
         #  self.__floor = None
         #  self.__tf = None
@@ -118,48 +135,113 @@ class Household(Agent):
         return self.__weight/self.__n_inds
 
     @property
+    def vul(self):
+        return self.__vul
+
+    @property
     def k_eff_0(self):
         return self.__k_eff_0
-
+    
+    @property
+    def k_priv_0(self):
+        return self.__k_priv_0
+    
+    @property
+    def k_pub_0(self):
+        return self.__k_pub_0
+    
+    @property
+    def d_k_eff_t(self):
+        return self.__d_k_eff_t
+    
+    @property
+    def d_k_priv_t(self):
+        return self.__d_k_priv_t
+    
+    @property
+    def d_k_pub_t(self):
+        return self.__d_k_pub_t
+    
     @property
     def lmbda(self):
         return self.__lmbda
 
     @property
-    def tau(self):
-        return self.__tau
-
-    @property
     def income_0(self):
         return self.__inc_0
+    
+    @property
+    def income_pub_0(self):
+        return self.__inc_pub_0
+    
+    @property
+    def income_priv_0(self):
+        return self.__inc_priv_0
 
     @property
     def income_sp(self):
         return self.__inc_sp
+    
+    @property
+    def d_inc_t(self):
+        return self.__d_inc_t
+    
+    @property
+    def d_inc_pub_t(self):
+        return self.__d_inc_pub_t
+    
+    @property
+    def d_inc_priv_t(self):
+        return self.__d_inc_priv_t
+    
+    @property
+    def d_inc_sp_t(self):
+        return self.__d_inc_sp_t
 
     @property
     def consum_0(self):
         return self.__con_0
     
     @property
-    def con_smooth(self):
-        return self.__con_smooth
+    def d_con_eff_t(self):
+        return self.__d_con_eff_t
     
     @property
-    def wb_smooth(self):
-        return self.__wb_smooth
+    def d_con_pub_t(self):
+        return self.__d_con_pub_t
+    
+    @property
+    def d_con_priv_t(self):
+        return self.__d_con_priv_t
+    
+    @property
+    def d_con_priv_sm(self):
+        return self.__d_con_priv_sm
+    
+    @property
+    def d_con_sp_t(self):
+        return self.__d_con_sp_t
+    
+    @property
+    def d_con_reco_t(self):
+        return self.__d_con_reco_t
+    
+    @property
+    def d_con_eff_sm(self):
+        return self.__d_con_eff_sm
+    
+    @property
+    def d_wb_t(self):
+        return self.__d_wb_t
+    
+    @property
+    def d_wb_sm(self):
+        return self.__d_wb_sm
 
     @property
     def decile(self):
         return self.__decile
 
-    @property
-    def poverty_trap(self):
-        return self.__poverty_trap
-    
-    @property
-    def recovery_type(self):
-        return self.__recovery_type
 
     @property
     def subsistence_line(self):
@@ -168,8 +250,14 @@ class Household(Agent):
     @property
     def savings(self):
         return self.__sav_t
+    
+    
+    def init_life(self):
+        """This initialises the life of each agent.
+        """
+        return
 
-    def update_reco(self, L_t=None, K=None, t_i=0, dt=0):
+    def update_reco(self, L_t=None, L_pub=None, K_pub=None, K=None):
         """
         Parameters
         ----------
@@ -186,17 +274,26 @@ class Household(Agent):
         None.
     
         """
-        if t_i==7:
-            self._dt = dt
-        self._update_k_eff()
-        self._update_income_sp(L_t, K)
-        self._update_income()
-        self._update_consum()
-        self._update_wb()
-        self._update_wb_sav()
-        self.__update_savings()
-        # if self.__recovery_type == 1:
-        #     self._update_wb_sav()
+        
+        self.__update_k(L_pub, K_pub)
+
+        self.__update_dinc(L_t, K)
+        
+        recovery_type, d_reco, rebuild=self.__get_recovery_path()
+        
+        self.__rebuild = rebuild
+        
+        self.__update_dcons(d_reco)
+        
+        floor, tf= self.__smooth_with_savings_2(d_reco)
+        
+        self.__update_dcons_sm(floor)
+
+        self.__update_savings(floor)
+            
+        self.__update_wb()
+        self.__update_wb_sm()
+
         return
 
 
@@ -208,9 +305,31 @@ class Household(Agent):
         """
         self.__tax_rate = tax_rate
         self.__k_eff_0 = (self.__inc_0 - self.__inc_sp)/((1-self.__tax_rate)*PI)
+        self.__k_priv_0 = self.__k_eff_0  * (1-K_PUB)
+        self.__k_pub_0 = self.__k_eff_0 * K_PUB
+    
+    def shock(self, aff_flag=False,L_pub=None,
+              L=None, K=None, dt=None):
+        """This function causes the agent to be shocked. The recovery track is set up and the
+           post disaster state is generated for all indicators.
+        Parameters
+        ----------
+        aff_flag : bool, optional
+            Bool indicating whether the household is affected by the current shock.
+            The default is False.
+        L : float, optional
+            Total national damage.
+        K : float, optional
+            Total national capital stock.
+        """
+        self.dt = dt
+
+        self.__set_shock_state(L, K, L_pub, aff_flag)
+
+        return
 
 
-    def _set_shock_state(self, L, K, aff_flag):
+    def __set_shock_state(self, L, K, L_pub, aff_flag):
         """This function calculates the initial damage and the initial loss in income,
            consumption and well being and updates the savings. 
         Parameters
@@ -220,71 +339,98 @@ class Household(Agent):
         K : float, optional
             Total national capital stock. The default is 0.
         """
-        #print(self.__hhid)
+        
+        # affected households get shocked
         if aff_flag:
-            
-            if (self.__k_eff_0 - self._d_k_eff_t) > 0.0:
-                self._t = 0.
-                self._d_k_eff_t += (self.__k_eff_0 - self._d_k_eff_t) * self._vul
-                opt_vul = self._d_k_eff_t / self.__k_eff_0
-                self._damage.append(self._d_k_eff_t)
-                self.__optimize_reco(vul=opt_vul)
-                
+            # damage capital stock
+            if self.__k_priv_0 - self.__d_k_priv_t  > 0.0:
+                self.t = 0.
+                # set self.__d_k_priv_t, self.__d_k_pub_t, self.__d_k_pub_t
+                self.__initialize_dkeff()
+                # set share of public damage
+                self.__share_pub_dam=self.__d_k_pub_t/L_pub
+            # ignore hh that do  not have any capital stock anymore
             else:
                 #self.__poverty_trap = True
-                self._damage.append(self._d_k_eff_t)
-                self.__lmbda.append(self.__lmbda[self._c_shock-1])
-                self.update_reco(L_t=L, K=K)
+                self.update_reco(L_t=L, K=K, L_pub=L_pub)
                 return
-            #if not self.__poverty_trap:
-            self._d_inc_sp_t = (L/K) * self.__inc_sp
-            self._d_inc_t = ((1-self.__tax_rate) * PI * self._d_k_eff_t + self._d_inc_sp_t)/DT_STEP
-    
-            self._set_recovery_path()
-        
-            if self.__recovery_type == 1:
-                #self.__cnt_ts += 1
-                self._d_con_t = self._d_inc_t + self.__recovery_spending
-                self.__smooth_with_savings_1()
-                
-                self.__con_smooth = self.__floor
-                self.__update_savings()
-                
-            elif self.__recovery_type == 2:
-                self._d_con_t = self._d_inc_t + self._possible_reco()
-                self.__smooth_with_savings_2()
-                self.__con_smooth = self.__floor
-                self.__update_savings()
             
-            elif self.__recovery_type == 3:
-                self._d_con_t = self._d_inc_t
-                self.__smooth_with_savings_3()
-                self.__con_smooth = self.__floor
-                self.__update_savings()
+            self.__update_dinc(L, K)
             
-            elif self.__recovery_type == 4:
-                self._d_con_t = self._d_inc_t
-                self.__smooth_with_savings_3()
-                self.__con_smooth = self.__floor
-                self.__update_savings()
-            self._update_wb()
-            self._update_wb_sav()
+            # determine recovery track
+            recovery_type, d_reco, rebuild=self.__get_recovery_path()
+            
+            # store the amount of capital stock that can be rebuild
+            self.__rebuild = rebuild
+            
+            self.__update_dcons(d_reco)
 
+            floor, tf= self.__smooth_with_savings_2(d_reco)
+            
+            self.__update_dcons_sm(floor)
+
+            self.__update_savings(floor)
+                
+            self.__update_wb()
+            self.__update_wb_sm()
+            
+        # unaffected households update their recovery and share of public damaged assets
         else:
             
-            self.update_reco(L_t=L, K=K)
-            
-        # if self.__recovery_type == 1:
-        #     self._update_wb_sav()
-        #self.__determine_sav_opt()
-            # else:
-            #     self._d_inc_sp_t = (L/K) * self.__inc_sp
-            #     self._d_inc_t = self._d_inc_t - (self.__inc_sp-self._d_inc_sp_t)
-            #     self._d_con_t = self.__con_0/100.#self._d_inc_t
-            #     self._update_wb()
-        return
+            self.__share_pub_dam=self.__d_k_pub_t/L_pub
 
-    def _get_reco_fee(self, t1=None, t2=None):
+            self.update_reco(L_t=L,L_pub=L_pub, K=K)
+ 
+        return
+    
+    def __initialize_dkeff(self):
+        
+        self.__d_k_eff_t += (self.__k_eff_0 - self.__d_k_eff_t) * self.__vul
+        self.__d_k_priv_t += (self.__k_priv_0 - self.__d_k_priv_t) * self.__vul
+        self.__d_k_pub_t += (self.__k_pub_0 - self.__d_k_pub_t) * self.__vul
+        
+        return
+    
+    def __update_dinc(self, L, K):
+    
+        self.__d_inc_sp_t = ((L/K) * self.__inc_sp)/DT_STEP
+        self.__d_inc_priv_t = ((1-self.__tax_rate) * PI * self.__d_k_priv_t)/DT_STEP
+        self.__d_inc_pub_t = ((1-self.__tax_rate) * PI * self.__d_k_pub_t)/DT_STEP
+
+        self.__d_inc_t = self.__d_inc_pub_t + self.__d_inc_priv_t + self.__d_inc_sp_t
+        
+        if self.__d_inc_t <0:
+            self.__d_inc_t=0
+            
+        if self.__d_inc_sp_t <0:
+            self.__d_inc_sp_t=0
+        return
+    
+    def __update_dcons(self, d_reco):
+        if self.hhid ==222:
+             print(d_reco)
+        self.__d_con_priv_t = self.__d_inc_priv_t + d_reco
+        self.__d_con_eff_t = self.__d_inc_t + d_reco
+        
+        return
+    
+    def __update_dcons_sm(self, floor):
+        
+        self.__d_con_priv_sm = floor
+        self.__d_con_eff_sm = floor + self.__d_inc_sp_t + self.__d_inc_pub_t
+        
+        return
+    
+    
+    def __set_pds(self):
+        
+        if PDS=='k_priv':
+            self.__sav_t += (self.__k_priv_0 - self.__d_k_priv_t) * self.__vul
+            
+        return
+   
+
+    def __get_reco_fee(self, damage=0, lmbda=0, t1=None, t2=None):
         """
         Calculates the recovery spending for one timestep under exponential recovery.
         Returns
@@ -292,17 +438,23 @@ class Household(Agent):
         TYPE
             recovery fee.
         """
-        if not t1:
-            t1 = self._t
+            
+        try:
 
-        if not t2:
-            t2 = self._t + self._dt
-
-        dam_0 = self._damage[self._c_shock] * np.e**(-t1*self.__lmbda[self._c_shock])
-        dam_1 = self._damage[self._c_shock] * np.e**(-t2*self.__lmbda[self._c_shock])
+            dam_0 = damage * np.e**(-t1*lmbda)
+            dam_1 = damage * np.e**(-t2*lmbda)
+            if self.hhid ==222:
+                print(np.e**(-t2*lmbda))
+        
+        except IndexError:
+            print(self.__hhid)
+            print(self.__recovery_type)
+        
         return dam_0-dam_1
     
-    def _set_recovery_path(self):
+
+    
+    def __get_recovery_path(self):
         """Check for recovery below subsistence level. It defines the initial recovery path.
          hh not effected --> 0
          exponential recovery --> 1
@@ -310,35 +462,39 @@ class Household(Agent):
          recovery generally below substistence --> 3
          recovery starting below substistence --> 4
         """
-        # 
-        if self._d_k_eff_t <= 0:
-            self.__recovery_type = 0
-            self.__recovery_spending = 0.
-            return
+        # household in poverty trap
+        if self.__d_k_priv_t <= 0:
+            recovery_type = 0
+            d_reco = 0
+            rebuild = 0
+            return recovery_type, d_reco, rebuild
 
+        lmbda=self.__get_reco_from_lookup(self.__d_k_priv_t / self.__k_priv_0)
+
+        opt_d_reco = self.__get_reco_fee(damage=self.__d_k_priv_t,
+                                                        lmbda=lmbda, t1=0, t2=self.dt)
+        # household recovers exponentially
+        if self.__check_subs(opt_d_reco) > 0:
+            recovery_type = 1
+            d_reco = opt_d_reco
+            rebuild = opt_d_reco
+        # household recovers along subsistence line
+        elif self.__possible_reco() > 0:
+            recovery_type = 2
+            d_reco = self.__possible_reco()
+            rebuild = self.__possible_reco() + SUBS_SAV_RATE
+            
+        # household lives or recovers under subsistence
+        else:
+            recovery_type = 3
+            d_reco=0
+            rebuild = SUBS_SAV_RATE
+            
+        return recovery_type, d_reco, rebuild
         
 
-        optimal_recovery_spending = self._get_reco_fee()
-        if self._check_subs(optimal_recovery_spending) > 0:
-            self.__recovery_type = 1
-            self.__recovery_spending = optimal_recovery_spending
-            return
-        elif self._possible_reco() > 0:
-            self.__recovery_type = 2
-            self.__recovery_spending = self._possible_reco() + SUBS_SAV_RATE
 
-            return
-
-        elif self.__con_0 < self.__subsistence_line:
-            self.__recovery_type = 3
-            self.__recovery_spending = SUBS_SAV_RATE
-            return
-        else:
-            self.__recovery_type = 4
-            self.__recovery_spending = SUBS_SAV_RATE
-            return
-
-    def _check_subs(self, opt_reco):
+    def __check_subs(self, opt_reco):
         """
         Checks whether exponential recovery is possible without crossing subsistence line.
         
@@ -355,7 +511,7 @@ class Household(Agent):
             returns -1.
         """
         
-        cons_level = self.__con_0 - (self._d_inc_t + opt_reco)
+        cons_level = self.__con_0 - (self.__d_inc_t + opt_reco)
 
         if cons_level >= self.__subsistence_line:
 
@@ -364,7 +520,7 @@ class Household(Agent):
         else:
             return -1
 
-    def _possible_reco(self):
+    def __possible_reco(self):
         """
         Calculates how much can be spend on recovery without falling below subsistence line.
         
@@ -375,23 +531,23 @@ class Household(Agent):
             returns -1.
         """
 
-        possible_reco = self.__con_0 - self._d_inc_t - self.__subsistence_line
+        possible_reco = self.__con_0 - self.__d_inc_t - self.__subsistence_line
 
-        if possible_reco > self._d_k_eff_t:
-            possible_reco = self._d_k_eff_t
+        if possible_reco > self.__d_k_priv_t:
+            possible_reco = self.__d_k_priv_t
 
         if possible_reco > 0:
             return possible_reco
         else:
             return -1
 
-    def _update_reco_spend(self):
+    def __update_reco_spend(self):
         """
         Checks whether a household enters a new recovery mode and calculates the recovery spending
         in the timestep.
 
         """
-
+        
         if self.__recovery_type == 0:
             self.__recovery_spending = 0.
             return
@@ -399,332 +555,291 @@ class Household(Agent):
         if self.__recovery_type == 1:
             # only use this for an optimization in each timestep
             if OPT_DYN:
-                opt_vul = self._d_k_eff_t / self.__k_eff_0
-                self._t = 0.
-                del self.__lmbda[-1]
-                self.__optimize_reco(vul=opt_vul)
+                opt_vul = self.__d_k_priv_t / self.__k_priv_0
+
+                self.t = 0.
+
+                lmbda= self.__get_reco_from_lookup(vul=opt_vul)
+                #self.__optimize_reco(vul=opt_vul)
                 self.__cnt_ts += 1
-                del self._damage[-1]
-                self._damage.append(self._d_k_eff_t)
-                self.__recovery_spending = self._get_reco_fee()
-                self.__smooth_with_savings_1()
+                self.__recovery_spending = self.__get_reco_fee(damage=self.__d_k_priv_t,
+                                                               lmbda=lmbda)
+
             else:
                 # get recovery spending
-                self.__recovery_spending = self._get_reco_fee()
+                self.__recovery_spending = self.__get_reco_fee()
             return
         
         # recovery along the subsistence line
+            
         if self.__recovery_type == 2:
 
-            opt_vul = self._d_k_eff_t / self.__k_eff_0
-            del self.__lmbda[-1]
-            self.__optimize_reco(vul=opt_vul)
-            del self._damage[-1]
-            self._damage.append(self._d_k_eff_t)
-            self._t = 0.
+            opt_vul = self.__d_k_priv_t / self.__k_priv_0
+
+            #self.__optimize_reco(vul=opt_vul)
+            lmbda=self.__get_reco_from_lookup(vul=opt_vul)
+
             # get recovery spending of exponential recovery
-            optimal_recovery_spending = self._get_reco_fee()
+            optimal_recovery_spending = self.__get_reco_fee(damage=self.__d_k_priv_t, lmbda=lmbda)
             # check if exponential recovery is possible
-            if self._check_subs(optimal_recovery_spending) > 0:
+            if self.__check_subs(optimal_recovery_spending) > 0:
                 # enter exponential recovery track
                 self.__recovery_type = 1
-                self.__smooth_with_savings_1()
+                
                 self.__recovery_spending = optimal_recovery_spending
-                self.__con_smooth = self.__floor
+
             else:
                 # remain in mode 2
                 # get possible recovery spending
-                self.__recovery_spending = self._possible_reco() + SUBS_SAV_RATE
-                # get the consumption after smoothing 
-                self.__smooth_with_savings_2()
+                if self.__possible_reco() == -1:
+                    self.__recovery_type = 4
+                    if self.__d_k_priv_t <= 0:
+                        self.__recovery_spending = 0
+                        self.__recovery_type = 0
+                        return
+                    # check if required recovery spending is smaller than the basic rate
+                    elif self.__d_k_priv_t < SUBS_SAV_RATE:
+                        self.__recovery_spending = self.__d_k_priv_t
+                    else:
+                        self.__recovery_spending = SUBS_SAV_RATE
+                    return
+                else:
+                    self.__recovery_spending = self.__possible_reco() + SUBS_SAV_RATE
+                    
+                    # get the consumption after smoothing 
+                    
             return
         # recovery below subsistence line (subsistence hh)
         if self.__recovery_type == 3:
             # check if household has already fully recovered
-            if self._d_k_eff_t <= 0:
+            if self.__d_k_priv_t <= 0:
                 self.__recovery_spending = 0
                 self.__recovery_type = 0
                 return
             # check if required recovery spending is smaller than the basic rate
-            elif self._d_k_eff_t < SUBS_SAV_RATE:
-                self.__recovery_spending = self._d_k_eff_t
+            elif self.__d_k_priv_t < SUBS_SAV_RATE:
+                self.__recovery_spending = self.__d_k_priv_t
             else:
                 self.__recovery_spending = SUBS_SAV_RATE
             return
         # recovery starting below subsistence line
         if self.__recovery_type == 4:
             # check if recovery from own resources is possible
-            if self._possible_reco() > 0:
+            if self.__possible_reco() > 0:
                 # if possible enter mode 2
-                self._t = 0.
+                self.t = 0.
                 self.__recovery_type = 2
-                self.__recovery_spending = self._possible_reco() + SUBS_SAV_RATE
-                self.__smooth_with_savings_2()
+                self.__recovery_spending = self.__possible_reco() + SUBS_SAV_RATE
             else:
                 # same procedure as in mode 3
-                if self._d_k_eff_t <= 0:
+                if self.__d_k_priv_t <= 0:
                     self.__recovery_spending = 0
                     self.__recovery_type = 0
                     return
 
-                if self._d_k_eff_t < SUBS_SAV_RATE:
-                    self.__recovery_spending = self._d_k_eff_t
+                if self.__d_k_priv_t < SUBS_SAV_RATE:
+                    self.__recovery_spending = self.__d_k_priv_t
                 
                 else:
                     self.__recovery_spending = SUBS_SAV_RATE
         return
 
 
-    def set_k_eff_0(self):
-        """
-        Calculate initial capital stock.
 
-        """
-        self._k_eff_0 = (self.__inc_0 - self.__inc_sp)/((1-self.__tax_rate)*PI)
-
-        return
-
-    def _update_income_sp(self, L_t, K):
-        """
-        Update the income from social transfers.
-
-        """
-        self._d_inc_sp_t = ((L_t/K) * self.__inc_sp)/DT_STEP
-        
-        if self._d_inc_sp_t <0:
-            self._d_inc_sp_t=0
-        return
-
-    def _update_income(self):
-        """
-        Update the income.
-
-        """
-        #if not self.__poverty_trap:
-        self._d_inc_t = ((1-self.__tax_rate) * PI * self._d_k_eff_t + self._d_inc_sp_t)/DT_STEP
-        if self._d_inc_t <0:
-            self._d_inc_t=0
-        #else:
-            #self._d_inc_t = self.__inc_0 - (self.__inc_sp - self._d_inc_sp_t)
-        return
-
-    def _update_consum(self):
+    def __update_consum(self):
         """
         Update consumption.
 
         """
         #if not self.__poverty_trap:
         # check for changes in the recovery track
-        self._update_reco_spend()
+        self.__update_reco_spend()
         # exponential recovery (or no recovery)
+
+            
+        
         if self.__recovery_type < 2:
             # calculate consumption loss
-            self._d_con_t = self._d_inc_t + self.__recovery_spending
+            self.__d_con_eff_t = self.__d_inc_t + self.__recovery_spending
+            self.__d_con_priv_t = self.__d_inc_priv_t + self.__recovery_spending
+
             if self.__recovery_type == 1:
-                if self._t <= self.__tf:
-                    self.__con_smooth = self.__floor
+                self.__smooth_with_savings_2()
+                if self.t <= self.__tf:
+                    
+                    self.__d_con_priv_sm = self.__floor
+                    self.__d_con_eff_sm = self.__floor + self.__d_inc_sp_t + self.__d_inc_pub_t
                 else:
-                    self.__con_smooth = self._d_con_t
+                    self.__d_con_priv_sm = self.__d_con_priv_t
+                    self.__d_con_eff_sm = self.__d_con_eff_t
             else:
-                self.__con_smooth = self._d_con_t
+                
+                self.__d_con_eff_sm = self.__d_con_eff_t
+                self.__d_con_priv_sm = self.__d_con_priv_t
+                
         elif self.__recovery_type == 2:
-            self._d_con_t = self._d_inc_t + self._possible_reco()
-            if self._t <= self.__tf:
-                self.__con_smooth = self.__floor
+            self.__d_con_eff_t = self.__d_inc_t + self.__possible_reco()
+            self.__d_con_priv_t = self.__d_inc_priv_t + self.__possible_reco()
+            
+            self.__smooth_with_savings_2()
+            
+            if self.t <= self.__tf:
+                
+                self.__d_con_priv_sm = self.__floor
+                self.__d_con_eff_sm = self.__floor + self.__d_inc_sp_t + self.__d_inc_pub_t
             else:
-                self.__con_smooth = self._d_con_t
+                self.__d_con_eff_sm = self.__d_con_eff_t
+                self.__d_con_priv_sm = self.__d_con_priv_t
         else:
-            self._d_con_t = self._d_inc_t
-            if self._t <= self.__tf:
-                self.__con_smooth = self.__floor
+            
+            self.__d_con_eff_t = self.__d_inc_t
+            self.__d_con_priv_t = self.__d_inc_priv_t
+            self.__smooth_with_savings_3()
+            
+            if self.t <= self.__tf:
+                
+                self.__d_con_priv_sm = self.__floor
+                self.__d_con_eff_sm = self.__floor + self.__d_inc_sp_t + self.__d_inc_pub_t
+                
             else:
-                self.__con_smooth = self._d_con_t
+                self.__d_con_eff_sm = self.__d_con_eff_t
+                self.__d_con_priv_sm = self.__d_inc_priv_t
     
-        if self._d_con_t <0:
-            self._d_con_t=0
+        if self.__d_con_eff_t <0:
+            self.__d_con_eff_t=0
             self.__recovery_spending = 0.
             self.__recovery_type = 0
         
-        if self.__con_smooth <0:
-            self.__con_smooth=0
-        
+        if self.__d_con_priv_sm <0:
+            self.__d_con_priv_t=0
+            self.__recovery_spending = 0.
+            self.__recovery_type = 0
+
         return
 
-    def _update_k_eff(self):
+    def __update_k(self, L_pub=0., K_pub=0.):
         """
         Updates capital stock damage.
 
         """
 
-        self._d_k_eff_t -= self.__recovery_spending
+        self.__d_k_priv_t -= self.__rebuild
+        self.__d_k_pub_t = L_pub*self.__share_pub_dam
         
-        if self._d_k_eff_t <=0:
-            self._d_k_eff_t=0.
-            self.__recovery_spending = 0.
-            self.__recovery_type = 0.
+        
+        if self.__d_k_priv_t <=0:
+            self.__d_k_priv_t=0.
+            
+        if self.__d_k_pub_t <=0:
+            self.__d_k_pub_t=0.
+            
         return
 
-    def _update_wb(self):
+    def __update_wb(self):
         
         """
         Update accumulated well-being loss (without savings)
 
         """
-        # set time over which well-being is calculated
-        self.__twb += self._dt
-        # get unperturbed consumption
-        con_0 = self.__con_0/self.__n_inds
-        # get individual consumption
-        d_con_t = self._d_con_t/self.__n_inds
+        # get individual unperturbed consumption
+        con_0_ind = self.__con_0/self.__n_inds
+        # get individual consumption loss
+        d_con_t_ind = self.__d_con_eff_t/self.__n_inds
+        
         # add gained well-being under unperturbed consumption 
-        self.__wb_0 += ((con_0**(1-ETA))/(1-ETA)) * self._dt
+        self.__wb_0 += ((con_0_ind**(1-ETA))/(1-ETA)) * self.dt
         # add gained well-being under consumption loss
-        self.__wb_t += (1/(1-ETA)) * (con_0 - d_con_t)**(1-ETA) * self._dt 
+        self.__wb_t += (1/(1-ETA)) * (con_0_ind - d_con_t_ind)**(1-ETA) * self.dt 
         # well-being loss
-        self._d_wb_t = self.__n_inds*(self.__wb_0 - self.__wb_t)#/self.__wb_0
+        self.__d_wb_t = self.__n_inds*(self.__wb_0 - self.__wb_t)#/self.__wb_0
 
         return
     
-    def _update_wb_sav(self):
+    def __update_wb_sm(self):
         """
         Update accumulated well-being loss
 
         """
         # set time over which well-being is calculated
-        con_0 = self.__con_0/self.__n_inds
+        con_0_ind = self.__con_0/self.__n_inds
         # get unperturbed consumption
-        d_con_t = self.__con_smooth/self.__n_inds
+        d_con_t_ind = self.__d_con_eff_sm/self.__n_inds
         # add gained well-being under unperturbed consumption
-        self.__wb_0_sm += ((con_0**(1-ETA))/(1-ETA)) * self._dt
+        self.__wb_0_sm += ((con_0_ind**(1-ETA))/(1-ETA)) * self.dt
         # add gained well-being under consumption loss
-        self.__wb_t_sm += (1/(1-ETA)) * (con_0 - d_con_t)**(1-ETA) * self._dt
+        self.__wb_t_sm += (1/(1-ETA)) * (con_0_ind - d_con_t_ind)**(1-ETA) * self.dt
         # well-being loss
-        self.__wb_smooth = self.__n_inds*(self.__wb_0_sm - self.__wb_t_sm)#/self.__wb_0
+        self.__d_wb_sm = self.__n_inds*(self.__wb_0_sm - self.__wb_t_sm)#/self.__wb_0
 
         return
     
-    def __update_savings(self):
+    def __update_savings(self, floor):
         """
         Update savings
 
         """
         # check whether household has fully recovered
-        if (self._d_con_t < 0.05*self.__con_0) & (self.__sav_t<self.__sav_0) & (self._t > self.__tf) :
-            # if hh has fully recovered but not rebuilt his savings stock
+        if (self.__d_con_priv_t < 0.005*self.__con_0) & (self.__sav_t<self.__sav_0):
+            
             self.__sav_t += self.__sav_0/DT_STEP
-        elif (self._t <= self.__tf) & (self.__sav_t> 0.0):
-            # if self.__recovery_type == 1:
-            #     self.__sav_t -= (self._d_con_t - self.__floor) *(self.__lmbda[self._c_shock]+(1-self.__lmbda[self._c_shock])/2)
-            # else:
-            self.__sav_t -= self._d_con_t - self.__floor
+    
+        elif (self.__d_con_priv_t > 0.005*self.__con_0) & (self.__sav_t> 0.0):
+
+            self.__sav_t -= self.__d_con_priv_t - floor
         # correct small drops under 0
         if self.__sav_t< 0.0:
             self.__sav_t=0.0
         return
     
-    #def __determine_sav_opt(self):
-        
-        # recovery below subsistence 
-        
-        
 
-    def __smooth_with_savings_0(self, vul=0.3):
-        """Sets the floor taken from savings to smoothen HH's consumption
-        loss and the time tf when it runs out of savings (original)
-        """
 
-        dc0 = self.__k_eff_0 * vul * (PI+self.__lmbda[self._c_shock])
-
-        if dc0 == 0:
-            self.__floor = 0
-            self.__tf = T_RNG
-            return
-        if self.__lmbda[self._c_shock] == 0:
-            self.__floor = int(round(min(dc0, max(dc0-(2/3)
-                                                * self.sav_t, 0.)), 0))
-            self.__tf = 1.
-            return
-
-        gamma = dc0
-        last_result = None
-
-        while True:
-
-            beta = gamma/dc0
-            result = dc0 * (1-beta) + gamma * np.log(beta) - self.__sav_t * self.__lmbda[self._c_shock]
-            try:
-                if (last_result < 0 and result > 0) or\
-                   (last_result > 0 and result < 0):
-    
-                    _t = -np.log(beta)/self.__lmbda[self._c_shock]
-    
-                    if _t < 0:
-                        print('RESULT!:\ngamma = ', gamma, '& beta = ',
-                              beta, ' & t = ', _t)
-                        print('CHECK:', dc0 * np.e**(self.__lmbda[self._c_shock] * _t),
-                              ' gamma = ', gamma)
-        
-                    if _t >= T_RNG:
-                        self.__floor = int(round(min(dc0, max(dc0-(2/3)
-                                                              * self.__sav_t, 0.)), 0.))
-                        self.__tf = 1.
-                        return
-
-                    self.__floor = int(round(gamma, 0))
-                    self.__tf = round(_t, 3)
-                    return
-
-            except: pass
-
-            last_result = result
-            gamma -= 0.01 * dc0
-            if gamma <= 0:
-                self.__floor = 0
-                self.__tf = T_RNG
-                return
-        return
-
-    def __smooth_with_savings_1(self):
+    def __smooth_with_savings_1(self,lmbda=0):
         """Sets the floor taken from savings to smoothen HH's consumption
         loss and the time tf when it runs out of savings under recovery type 1
         """
-        # consumption loss in the moment of the shock (probably redundant replace by self._d_con_t)
-        dc0 = self._d_inc_t *DT_STEP + self.__lmbda[self._c_shock]*self._d_k_eff_t
+        # consumption loss in the moment of the shock but annually
+
+        dc0 = self.__d_inc_priv_t *DT_STEP + lmbda*(self.__d_k_priv_t)
+        
+        
         
         # check whether there are savings available
         if self.__sav_t <= 0:
-            self.__floor = self._d_con_t
+            self.__floor = self.__d_con_priv_t
             self.__tf = 0.
             return
         # check whether the shock can be smoothed completely
-        if self.__sav_t > dc0/(self.__lmbda[self._c_shock]):
+        if self.__sav_t > dc0/(lmbda):
             self.__floor = 0.
             self.__tf = 40.
             return
         
         # initilize optimization
         f = 0.01
-        last_result = (1/(self.__lmbda[self._c_shock])) * (dc0+f*(np.log(f)- np.log(dc0)-1)) - self.__sav_t
+        last_result = (1/(lmbda)) * (dc0+f*(np.log(f)- np.log(dc0)-1)) - self.dt/2.*(f-dc0)-self.__sav_t
         
         f += 0.1
         
         # look for the optimal floor level
         while f<dc0:
-
-            result = (1/(self.__lmbda[self._c_shock])) * (dc0+f*(np.log(f)- np.log(dc0)-1)) - self.__sav_t
+            #result = (1/(self.__lmbda[self.__c_shock])) * (dc0+f*(np.log(f)- np.log(dc0)-1)) - self.__sav_t
+            result = (1/lmbda) * (dc0+f*(np.log(f)- np.log(dc0)-1)) - self.dt/2.*(f-dc0)-self.__sav_t
 
 
             if (last_result < 0 and result > 0) or\
                (last_result > 0 and result < 0):
                 
-                f = f/dc0*self._d_con_t
+                #f = f/dc0*self.__d_con_eff_t
                 
                 # small correction of numeric errors
-                self.__floor=f+(self._d_con_t - self._d_con_t*np.e**(-self.__lmbda[self._c_shock]*(1/DT_STEP)))/3.
+                #self.__floor=f+(self.__d_con_eff_t - self.__d_con_eff_t*np.e**(-self.__lmbda[self.__c_shock]*(1/DT_STEP)))/3.
                 
-                f=self.__floor/self._d_con_t *dc0
+                #f=self.__floor/self.__d_con_eff_t *dc0
+                self.__floor=(f/dc0)*self.__d_con_priv_t
                 
-                self.__tf = -(1/(self.__lmbda[self._c_shock])) * np.log(f/dc0)
+                
+      
+                self.__tf = (-(1/(lmbda)) * np.log(self.__floor/self.__d_con_priv_t))
                   
                 return
             else:
@@ -736,77 +851,88 @@ class Household(Agent):
 
         return
     
-    def __smooth_with_savings_2(self):
+    def __smooth_with_savings_2(self, reco_spend):
         """Sets the floor taken from savings to smoothen HH's consumption
         loss and the time tf when it runs out of savings under recovery mode 2
-        """
-        
+        """       
 
         # check whether there are savings available 
         if self.__sav_t <= 0:
-            self.__floor = self._d_con_t
-            self.__tf = 0.0
-            return
+            floor = self.__d_con_priv_t
+            tf = 0.0
+            return floor, tf
 
-        dc0 = self._d_con_t
-        
-        f_1 = dc0 + np.sqrt(2 * self.__sav_t*self.__recovery_spending/DT_STEP*PI*(1-self.__tax_rate))
-
-        f_2 = dc0 - np.sqrt(2 * self.__sav_t*self.__recovery_spending/DT_STEP*PI*(1-self.__tax_rate))
-
-        if f_1 <=dc0:
-            self.__floor = f_1
-
-        elif f_2 <=dc0:
-            self.__floor = f_2
-
-        else:
-            raise ValueError
-        
-        self.__floor=self.__floor+(self.__recovery_spending/DT_STEP)/2.
-
-        self.__tf = (dc0 - self.__floor)/(self.__recovery_spending*PI*(1-self.__tax_rate))
-
-        if self.__floor < 0:
-            self.__floor = 0.
-            self.__tf = (dc0 - self.__floor)/(self.__recovery_spending*PI*(1-self.__tax_rate))
-
-        return
-    
-    def __smooth_with_savings_3(self):
-        """Sets the floor taken from savings to smoothen HH's consumption
-        loss and the time tf when it runs out of savings under recovery mode 3
-        """
-        # check whether there are savings available
-        if self.__sav_t <= 0:
-            self.__floor = self._d_con_t
-            self.__tf = 0.0
-            return
-
-        dc0 = self._d_con_t
-
-
-        f = dc0 - np.sqrt(2 * self.__sav_t*SUBS_SAV_RATE/DT_STEP*PI*(1-self.__tax_rate))
-        
-        self.__floor=f+(SUBS_SAV_RATE/DT_STEP)/2.
-
+        dc0 = self.__d_con_priv_t
         
 
-        self.__tf = (dc0 - self.__floor)/(SUBS_SAV_RATE*PI*(1-self.__tax_rate))
+        f_2 = dc0 - np.sqrt(2 * self.__sav_t*reco_spend/DT_STEP*PI*(1-self.__tax_rate))
 
-        if self.__floor < 0:
-            self.__floor = 0.
-            self.__tf = (dc0 - self.__floor)/(SUBS_SAV_RATE*PI*(1-self.__tax_rate))
+        floor= f_2 + (reco_spend/DT_STEP)/2.
+        
+        if floor >self.__d_con_priv_t:
+            floor = self.__d_con_priv_t
+
+
+        tf = (dc0 - floor)/(SUBS_SAV_RATE*PI*(1-self.__tax_rate))
+
+        if floor < 0:
+            floor = 0.
+            tf = (dc0 - floor)/(reco_spend*PI*(1-self.__tax_rate))
             
-        return
+  
+        return floor, tf
+    
+    # def __smooth_with_savings_3(self):
+    #     """Sets the floor taken from savings to smoothen HH's consumption
+    #     loss and the time tf when it runs out of savings under recovery mode 3
+    #     """
+    #     # check whether there are savings available
+    #     if self.__sav_t <= 0:
+    #         self.__floor = self.__d_con_priv_t
+    #         self.__tf = 0.0
+    #         return
 
+    #     dc0 = self.__d_con_priv_t
+
+
+    #     f = dc0 - np.sqrt(2 * self.__sav_t*SUBS_SAV_RATE/DT_STEP*PI*(1-self.__tax_rate))
+        
+    #     self.__floor=f+(SUBS_SAV_RATE/DT_STEP)/2.
+        
+    #     if self.__floor > dc0:
+    #         self.floor= dc0
+
+    #     self.__tf = (dc0 - self.__floor)/(SUBS_SAV_RATE*PI*(1-self.__tax_rate))
+
+    #     if self.__floor < 0:
+    #         self.__floor = 0.
+    #         self.__tf = (dc0 - self.__floor)/(SUBS_SAV_RATE*PI*(1-self.__tax_rate))
+            
+    #     return
+    
+    
+    def __get_reco_from_lookup(self, vul):
+        
+        lambdas= pd.read_csv('../data/data_lookup/lambdas.csv')
+        
+        if vul < 0.001:
+            vul=0.001
+        
+        try:
+
+            lmbda=lambdas.loc[np.round(lambdas['vul'],3)==np.round(vul,3),'lmbda'].values[0]
+            
+        except IndexError:
+            
+            print(np.round(vul,3))
+        
+        return lmbda
 
 
     def __optimize_reco(self, vul=0.3):
         """
         This is the core optimization function, that numerically optimizes
-        the optimal reconstruction rate lmbda of the household and derives the
-        reconstruction time tau
+        the optimal reconstruction rate lmbda of the household 
         TODO (- eventually implement a static jit version
               - this must be done multicore)
         """
@@ -817,8 +943,6 @@ class Household(Agent):
             
             print('invalid k_eff')
             print(self.__hhid)
-            self.__k_eff_0 = (self.__inc_0 - self.__inc_sp)/((1-self.__tax_rate)*PI)
-            print(self.__k_eff_0)
             vul = 0.3
 
         last_integ = 0.
@@ -841,14 +965,7 @@ class Household(Agent):
                     h=abs(h)
                     integ += np.e**(-dt * (RHO + lmbda)) * ((PI + lmbda) * dt - 1)*h**(-ETA)
                     if np.isnan(integ)==True:
-                        print(lmbda)
-                        print( np.e**(-dt * (RHO + lmbda)) )
-                        print(((PI + lmbda) * dt - 1))
-                        print(PI - (PI + lmbda)*vul * np.e**(-lmbda * dt))
-                        print((PI - (PI + lmbda) * vul * np.e**(-lmbda * dt))**(-ETA))
-                        print('vul')
-                        print(vul)
-                        print(integ)
+
                         break
                     
                 if np.isnan(integ)==True:
@@ -881,7 +998,6 @@ class Household(Agent):
                 self.__lmbda.append(out)
                 
 
-                self.__tau = np.log(1./0.05) * (1./out)
 
                 return
 
@@ -900,7 +1016,6 @@ class Household(Agent):
             c+=1
         
         self.__lmbda.append(0.1)
-        self.__tau = np.log(1./0.05) * (1./0.1)
         print('optimization failed')
         print(vul)
         

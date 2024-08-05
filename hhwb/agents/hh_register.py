@@ -9,6 +9,7 @@ import os
 import numpy as np
 import pandas as pd
 from hhwb.agents.household import Household
+from zipfile import ZipFile 
 
 DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
 
@@ -72,8 +73,13 @@ class HHRegister():
             isurban (str): name of the column that indicates whether the household is located in
                            an urban or rural area
         """
+        
+        with ZipFile(work_path + path, 'r') as zip_ref:
+            # Extract the CSV file to a temporary directory
+            zip_ref.extract('test_hh.csv', path='temp')
+        
 
-        data = pd.read_csv(work_path + path)
+        data = pd.read_csv('temp/' + 'test_hh.csv')
         self.__n_hh = data.shape[0]
         self.__extract_meta_info(data, id_col)
 
@@ -106,7 +112,7 @@ class HHRegister():
             hh = Household(hhid=hh_id, n_inds=hh_inds, w=hh_w, vul=hh_vul, i_0=hh_inc, i_sp=hh_inc_sp,
                            region=hh_reg, savings=hh_sav, subsistence_line=hh_subsistence_line, decile=hh_dec,
                            isurban=hh_urban, ispoor=hh_poor)
-            print(hhid)
+            #print(hhid)
             """append list of households"""
             hh_list.append(hh)
 
