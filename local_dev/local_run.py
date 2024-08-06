@@ -35,13 +35,7 @@ R = 3339
 # r minimum recovery_rate
 k_pub = 0.25
 
-pds=None #'k_priv'
 
-bbb_type= None # bbb or sf or combined
-
-bbb_factor=None#'bbb'
-
-sf_factor=None#1.5
 
 
 """save configuration of the run"""
@@ -53,10 +47,6 @@ params=pd.DataFrame(data={'PI':PI,
                   'SUBS_SAV_RATE':R,
                   'T_RNG':T_RNG,
                   'K_PUB':k_pub,
-                  'PDS': pds,
-                  'BBB_TYPE':bbb_type,
-                  'BBB_FACTOR':bbb_factor,
-                  'SF_FACTOR':sf_factor,
                   'SUBSISTENCE_LINE':subsistence_line}, index=[0])
 
 params.to_csv('params.csv')
