@@ -4,9 +4,11 @@ local_dev/*.csv
 
 # ignore data/test_output/
 data/test_output/
+data/local_dev/*.csv
 
 # Ignore all .csv files in test_hh
 data/test_hh/*.csv
+data/test_hh/*.zip
 
 # Ignore all .csv files
 data/test_shocks/*.csv
