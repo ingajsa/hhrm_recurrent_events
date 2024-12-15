@@ -9,11 +9,12 @@ import os
 import random
 import numpy as np
 import pandas as pd
+import re
 import multiprocessing as mp
 from functools import partial
 from hhwb.util.constants import  DT_STEP, RECO_PERIOD
 from datetime import datetime, date
-from zipfile import ZipFile 
+from zipfile import ZipFile
 
 
 AGENT_TYPE = 'SH'
@@ -83,14 +84,29 @@ class Shock():
         return self.__dt
     
     @staticmethod
-    def apply_shock(hh, L, K, L_pub, dt_reco, affected_hhs):
+    def apply_shock(hh, L, K, L_pub, dt_reco, affected_hhs, vuls):
         """wrapper function for the shocking"""
 
         if hh.hhid in affected_hhs:
-            hh.shock(aff_flag=True, L_pub=L_pub, L=L, K=K, dt=dt_reco)
+            hh.shock(aff_flag=True, L_pub=L_pub, L=L, K=K, dt=dt_reco, vul=vuls[int(hh.hhid)])
         else:
-            hh.shock(aff_flag=False, L_pub=L_pub, L=L, K=K, dt=dt_reco)
+            hh.shock(aff_flag=False, L_pub=L_pub, L=L, K=K, dt=dt_reco, vul=vuls[int(hh.hhid)])
         return hh
+    
+
+    def contains_date_format(self, series):
+        
+        date_pattern = re.compile(r'\b\d{4}-\d{2}-\d{2}\b')
+        
+        return series[series.astype(str).str.contains(date_pattern)]
+    
+    
+
+    # Function to extract dates from a string
+    def __extract_dates(self, string):
+        # Regular expression to match dates
+        date_pattern = re.compile(r'\b\d{4}-\d{2}-\d{2}\b')
+        return date_pattern.findall(string)
     
     def read_shock(self, work_path, path, event_identifier,run):
         
@@ -137,6 +153,74 @@ class Shock():
         
         return
     
+    def __get_months(self, start_date, strings):
+    
+        # Regular expression to match dates
+        date_pattern = re.compile(r'\b\d{4}-\d{2}-\d{2}\b')
+
+        # Reference date
+        reference_date = datetime.strptime("2000-01-01", "%Y-%m-%d")
+
+        # Extract dates and calculate days since reference date
+        date_differences = []
+
+        for s in strings:
+            dates = date_pattern.findall(s)
+            for date_str in dates:
+                date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+                days_since_reference = (date_obj - reference_date).days
+                date_differences.append(int(np.round(days_since_reference/28)))
+    
+        return date_differences
+    
+    def read_vul_shock(self, path, output_path, file, start_year):
+        
+        """this is a function that only reads already preprocessed shock data (households - events)
+           """
+           
+           
+        with ZipFile(path, 'r') as zip_ref:
+            # Extract the CSV file to a temporary directory
+            zip_ref.extract(file, path='temp')
+        
+        shock_data = pd.read_csv(path)
+        
+        # Select columns that contain the date format
+        event_names = self.contains_date_format(shock_data.columns)
+
+        # Filter the DataFrame with the selected columns
+        selected_shocks = shock_data[event_names]
+        
+        selected_shocks=selected_shocks.loc[:,selected_shocks.sum()>0]
+        
+        event_names =selected_shocks.columns
+        
+        # Apply the function to the DataFrame
+        months=self.__get_months(start_year, event_names)
+
+        self.__aff_ids=np.zeros((selected_shocks.shape[0],len(list(set(months)))))
+        
+        n_agg_events=list(set(months))
+        
+        n_agg_events.sort()
+        
+        for m, week in enumerate(n_agg_events):
+            
+            locat = np.where(np.array(months)==week)
+            
+            self.__aff_ids[:, m]=selected_shocks.iloc[:, locat[0]].max(axis=1)
+        
+        self.__time_stemps = n_agg_events
+        
+        shock_df = pd.DataFrame(data=self.__aff_ids, columns=np.array(n_agg_events).astype(int).astype(str))
+
+        shock_df.to_csv(output_path+'shocks_aggregated.csv')
+        
+        return
+    
+    
+   
+    
     def shock(self, event_index, gov, hhs, dt_reco, cores):
         """This function shocks affected households. Distributes shocks to multiple cores
 
@@ -149,24 +233,30 @@ class Shock():
             dt_reco (float) : time step
             cores (int) : number available threads
         """
+        test=self.__aff_ids
+        affected_hhs = np.where(self.__aff_ids[:, event_index]>0.00000000001)[0]
+        vuls=self.__aff_ids[:, event_index]
         
-        affected_hhs = np.where(self.__aff_ids[:, event_index]==1)[0]
-        L_t = 0.
-        L_pub_t = 0.
+        # L_t = 0.
+        # L_pub_t = 0.
+        L_t = gov.L_t
+        L_pub_t = gov.L_pub_t
+        print('current')
+        
         
         for h_ind, hh in enumerate(hhs):
-            if hh.hhid in affected_hhs:
-                
-                L_pub_t += hh.vul * (hh.k_pub_0 - hh.d_k_pub_t)
-                L_t += hh.vul * ((hh.k_pub_0 - hh.d_k_pub_t) + (hh.k_priv_0 - hh.d_k_priv_t))
-            else:
-                
-                L_pub_t += hh.d_k_pub_t
-                L_t += hh.d_k_priv_t + hh.d_k_pub_t
+             if hh.hhid in affected_hhs:
+            
+                L_pub_t += vuls[int(hh.hhid)] * (hh.k_pub_0 - hh.d_k_pub_t)*hh.weight
+                L_t += vuls[int(hh.hhid)]  * ((hh.k_pub_0 - hh.d_k_pub_t) + (hh.k_priv_0 - hh.d_k_priv_t))*hh.weight
+        
+        
+
                 
         gov.shock(aff_flag=True, L=L_t, L_pub=L_pub_t, dt=dt_reco)
         p = mp.Pool(cores)       
-        prod_x = partial(Shock.apply_shock, L=L_t, K=gov.K,L_pub=L_pub_t, dt_reco=dt_reco, affected_hhs=affected_hhs)
+        prod_x = partial(Shock.apply_shock, L=L_t, K=gov.K,L_pub=L_pub_t,
+                         dt_reco=dt_reco, affected_hhs=affected_hhs, vuls=vuls)
         
         hhs = p.map(prod_x, hhs)
         p.close()

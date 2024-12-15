@@ -162,43 +162,43 @@ class ClimateLife():
         gov_ =  pd.DataFrame(columns=['kpub', 'kpriv', 'ipub', 'ipriv','inc', 'inc_sp', 'cons',
                                       'cons_priv', 'cons_sm', 'cons_priv_sm', 'wb', 'wb_sm'])
         
-        keff.to_csv(work_path+result_path+'keff.csv')
-        kpub.to_csv(work_path+result_path+'kpub.csv')
-        kpriv.to_csv(work_path+result_path+'kpriv.csv')
+        keff.to_csv(result_path+'keff.csv')
+        kpub.to_csv(result_path+'kpub.csv')
+        kpriv.to_csv(result_path+'kpriv.csv')
         
-        ipub.to_csv(work_path+result_path+'ipub.csv')
-        ipriv.to_csv(work_path+result_path+'ipriv.csv')
+        ipub.to_csv(result_path+'ipub.csv')
+        ipriv.to_csv(result_path+'ipriv.csv')
         
-        inc_.to_csv(work_path+result_path+'inc.csv')
-        inc_sp_.to_csv(work_path+result_path+'inc_sp.csv')
-        cons_.to_csv(work_path+result_path+'cons.csv')
-        cons_priv_.to_csv(work_path+result_path+'cons_priv.csv')
-        cons_sm_.to_csv(work_path+result_path+'cons_sm.csv')
-        cons_priv_sm_.to_csv(work_path+result_path+'cons_priv_sm.csv')
-        wb_.to_csv(work_path+result_path+'wb.csv')
-        wb_sm_.to_csv(work_path+result_path+'wb_sm.csv')
-        sav_.to_csv(work_path+result_path+'sav.csv')
-        gov_.to_csv(work_path+result_path+'gov.csv')
+        inc_.to_csv(result_path+'inc.csv')
+        inc_sp_.to_csv(result_path+'inc_sp.csv')
+        cons_.to_csv(result_path+'cons.csv')
+        cons_priv_.to_csv(result_path+'cons_priv.csv')
+        cons_sm_.to_csv(result_path+'cons_sm.csv')
+        cons_priv_sm_.to_csv(result_path+'cons_priv_sm.csv')
+        wb_.to_csv(result_path+'wb.csv')
+        wb_sm_.to_csv(result_path+'wb_sm.csv')
+        sav_.to_csv(result_path+'sav.csv')
+        gov_.to_csv(result_path+'gov.csv')
         
 
         n_shock = 0
         
         
-        with open(work_path+result_path+'keff.csv', 'w', newline='') as f_keff,\
-             open(work_path+result_path+'kpub.csv', 'w', newline='') as f_kpub,\
-             open(work_path+result_path+'kpriv.csv', 'w', newline='') as f_kpriv,\
-             open(work_path+result_path+'cons_priv.csv', 'w', newline='') as f_cons_priv,\
-             open(work_path+result_path+'cons_priv_sm.csv', 'w', newline='') as f_cons_priv_sm,\
-             open(work_path+result_path+'cons_sm.csv', 'w', newline='') as f_cons_sm,\
-             open(work_path+result_path+'cons.csv', 'w', newline='') as f_cons,\
-             open(work_path+result_path+'wb.csv', 'w', newline='') as f_wb,\
-             open(work_path+result_path+'ipub.csv', 'w', newline='') as f_ipub,\
-             open(work_path+result_path+'ipriv.csv', 'w', newline='') as f_ipriv,\
-             open(work_path+result_path+'inc.csv', 'w', newline='') as f_inc,\
-             open(work_path+result_path+'inc_sp.csv', 'w', newline='') as f_inc_sp,\
-             open(work_path+result_path+'wb_sm.csv', 'w', newline='') as f_wb_sm,\
-             open(work_path+result_path+'sav.csv', 'w', newline='') as f_sav,\
-             open(work_path+result_path+'gov.csv', 'w', newline='') as f_gov:
+        with open(result_path+'keff.csv', 'w', newline='') as f_keff,\
+             open(result_path+'kpub.csv', 'w', newline='') as f_kpub,\
+             open(result_path+'kpriv.csv', 'w', newline='') as f_kpriv,\
+             open(result_path+'cons_priv.csv', 'w', newline='') as f_cons_priv,\
+             open(result_path+'cons_priv_sm.csv', 'w', newline='') as f_cons_priv_sm,\
+             open(result_path+'cons_sm.csv', 'w', newline='') as f_cons_sm,\
+             open(result_path+'cons.csv', 'w', newline='') as f_cons,\
+             open(result_path+'wb.csv', 'w', newline='') as f_wb,\
+             open(result_path+'ipub.csv', 'w', newline='') as f_ipub,\
+             open(result_path+'ipriv.csv', 'w', newline='') as f_ipriv,\
+             open(result_path+'inc.csv', 'w', newline='') as f_inc,\
+             open(result_path+'inc_sp.csv', 'w', newline='') as f_inc_sp,\
+             open(result_path+'wb_sm.csv', 'w', newline='') as f_wb_sm,\
+             open(result_path+'sav.csv', 'w', newline='') as f_sav,\
+             open(result_path+'gov.csv', 'w', newline='') as f_gov:
                  
                  
                  # open(work_path+result_path+'cons.csv', 'w', newline='') as f_cons,\

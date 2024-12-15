@@ -11,25 +11,28 @@ from zipfile import ZipFile
 
 class DataAnalysis():
     
-    def __init__(self, survey_data_path='', shock_data_path='', output_data_path='', column_id='', run_name=''):
+    def __init__(self, survey_data_path='', hh_file='', shock_data_path='', output_data_path='', run_name=''):
 
         self.__output_data_path = output_data_path
 
         
         with ZipFile(survey_data_path, 'r') as zip_ref:
             # Extract the CSV file to a temporary directory
-            zip_ref.extract('test_hh.csv', path='temp')
+            zip_ref.extract(hh_file, path='temp')
         
 
-        self.__hhs = pd.read_csv('temp/' + 'test_hh.csv')
+        self.__hhs = pd.read_csv('temp/' + hh_file)
 
         self.__run_name = run_name
-        self.__column_id = column_id
         
     def analyse_time(self, step=1000,name='moj'):
         """ Calculates time under subsistence line and income and consumption losses"""      
         col=0
         add=step
+        if col+add>=self.__hhs.shape[0]:
+            add=self.__hhs.shape[0]-col
+        else:
+            add=step
         while add > 0:
             print(col)
             cols=np.arange(col,col+add)
@@ -44,9 +47,9 @@ class DataAnalysis():
             for i,hhid in enumerate(cols):
                 #print(hhid)
                 self.__hhs.loc[self.__hhs['fhhid']==hhid,
-                               'time_under_sub_sm{}'.format(self.__column_id)]=np.array(cons_list[i]-df.loc[:,hhid]<sub_list[i]).sum()
+                               'time_under_sub_sm']=np.array(cons_list[i]-df.loc[:,hhid]<sub_list[i]).sum()
                 self.__hhs.loc[self.__hhs['fhhid']==hhid,
-                               'reco_time_sm{}'.format(self.__column_id)]=np.array(cons_list[i]-df.loc[:,hhid]<0.95*cons_list[i]).sum()
+                               'reco_time_sm']=np.array(cons_list[i]-df.loc[:,hhid]<0.95*cons_list[i]).sum()
             self.__hhs.loc[self.__hhs['fhhid'].isin(cols),'cons_sm_tot']=df.sum(axis=0)
             self.__hhs.loc[self.__hhs['fhhid'].isin(cols),'cons_tot']=df_cons.sum(axis=0)
             self.__hhs.loc[self.__hhs['fhhid'].isin(cols),'inc_tot']=df_inc.sum(axis=0)
@@ -59,7 +62,7 @@ class DataAnalysis():
             else:
                 add=step
        
-        self.__hhs.to_csv('survey_'+self.__run_name+'_analysed.csv')
+        self.__hhs.to_csv(self.__output_data_path + 'hhs_'+self.__run_name+'_analysed.csv')
         #self.__hhs.to_csv(self.__output_data_path+name)
         
     def analyse_wb(self, step=1000):
@@ -67,13 +70,17 @@ class DataAnalysis():
         
         col=0
         add=step
+        if col+add>=self.__hhs.shape[0]:
+            add=self.__hhs.shape[0]-col
+        else:
+            add=step
         while add > 0:
             print(col)
             cols=np.arange(col,col+add)
 
             df=pd.read_csv(self.__output_data_path + 'wb.csv', usecols=cols, header=None)
             
-            self.__hhs.loc[self.__hhs['fhhid'].isin(cols),'wb_loss{}'.format(self.__column_id)]=np.array(df.max())
+            self.__hhs.loc[self.__hhs['fhhid'].isin(cols),'wb_loss']=np.array(df.max())
             col+=add
             if col+add>=self.__hhs.shape[0]:
                 add=self.__hhs.shape[0]-col
@@ -82,27 +89,34 @@ class DataAnalysis():
 
         col=0
         add=step
+        if col+add>=self.__hhs.shape[0]:
+            add=self.__hhs.shape[0]-col
+        else:
+            add=step
         while add > 0:
             print(col)
             cols=np.arange(col,col+add)
 
             df=pd.read_csv(self.__output_data_path + 'wb_sm.csv', usecols=cols, header=None)
             
-            self.__hhs.loc[self.__hhs['fhhid'].isin(cols),'wb_loss_sm{}'.format(self.__column_id)]=np.array(df.max())
+            self.__hhs.loc[self.__hhs['fhhid'].isin(cols),'wb_loss_sm']=np.array(df.max())
             col+=add
             if col+add>=self.__hhs.shape[0]:
                 add=self.__hhs.shape[0]-col
             else:
                 add=step
             
-        self.__hhs.to_csv('survey_'+self.__run_name+'_analysed.csv')
+        self.__hhs.to_csv(self.__output_data_path + 'hhs_'+self.__run_name+'_analysed.csv')
 
         
     def analyse_time_steps(self, step=10000):
         """ Stores information on specific variable for selected timesteps"""
         col=0
         add=step
-        
+        if col+add>=self.__hhs.shape[0]:
+            add=self.__hhs.shape[0]-col
+        else:
+            add=step
         #month=[32, 34, 38, 43, 53, 78, 80, 101, 160, 169, 182, 240]
 
         month = [  7,  19,  20,  26,  28,  32,  34,  38, 43, 47,  48,  53,  59,  64,
@@ -149,7 +163,7 @@ class DataAnalysis():
             else:
                 add=step"""
             
-        self.__hhs.to_csv('survey_'+self.__run_name+'_analysed.csv')
+        self.__hhs.to_csv(self.__output_data_path + 'hhs_'+self.__run_name+'_analysed.csv')
         
             
                     

@@ -8,9 +8,9 @@ Created on Fri Mar 13 21:48:03 2020
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-
 #from misc.util.constants_adapt import PI, ETA, SUBS_SAV_RATE
 from hhwb.util.constants import  DT_STEP, TEMP_RES, DT, RHO
+
 
 OPT_DYN=True
 
@@ -21,10 +21,9 @@ ETA=pams['ETA'].values[0]
 SUBS_SAV_RATE=pams['SUBS_SAV_RATE'].values[0]/13.
 T_RNG=pams['T_RNG'].values[0]
 K_PUB=pams['K_PUB'].values[0]
-PDS=pams['PDS'].values[0]
-BBB_TYPE=pams['BBB_TYPE'].values[0]
-BBB_FACTOR=pams['BBB_FACTOR'].values[0]
-SF_FACTOR=pams['SF_FACTOR'].values[0]
+COUNTRY=pams['COUNTRY'].values[0]
+OUTPUT_DATA_PATH=pams['OUTPUT_DATA_PATH'].values[0]
+
 
 AGENT_TYPE = 'HH'
 
@@ -71,7 +70,7 @@ class Household():
     """
 
     def __init__(self, hhid=0, n_inds=1, w=1., vul=0.2, i_0=1., i_sp=0.2, region=None,
-                 savings=0., subsistence_line=0., decile=None, isurban=1, ispoor=0):
+                 savings=0., subsistence_line=0., vul_mode='hh', decile=None, isurban=1, ispoor=0):
         """! constructor"""
 
         #  Attributes set during initialisation
@@ -81,6 +80,7 @@ class Household():
         self.__hhid = hhid
         self.__n_inds = n_inds
         self.__weight = w
+        self.__vul_mode = vul_mode
         self.__vul = vul
         self.__share_pub_dam=0.
         
@@ -275,6 +275,9 @@ class Household():
     
         """
         
+        if self.__hhid ==0:    
+            print(L_pub/(L_t+1))
+        
         self.__update_k(L_pub, K_pub)
 
         self.__update_dinc(L_t, K)
@@ -309,7 +312,7 @@ class Household():
         self.__k_pub_0 = self.__k_eff_0 * K_PUB
     
     def shock(self, aff_flag=False,L_pub=None,
-              L=None, K=None, dt=None):
+              L=None, K=None, dt=None, vul=0.2):
         """This function causes the agent to be shocked. The recovery track is set up and the
            post disaster state is generated for all indicators.
         Parameters
@@ -324,12 +327,12 @@ class Household():
         """
         self.dt = dt
 
-        self.__set_shock_state(L, K, L_pub, aff_flag)
+        self.__set_shock_state(L, K, L_pub, aff_flag, vul)
 
         return
 
 
-    def __set_shock_state(self, L, K, L_pub, aff_flag):
+    def __set_shock_state(self, L, K, L_pub, aff_flag, vul):
         """This function calculates the initial damage and the initial loss in income,
            consumption and well being and updates the savings. 
         Parameters
@@ -341,12 +344,19 @@ class Household():
         """
         
         # affected households get shocked
+        
+        if self.__vul_mode=='hh':
+            vul=self.__vul
+        else:
+            vul=vul
+
         if aff_flag:
             # damage capital stock
             if self.__k_priv_0 - self.__d_k_priv_t  > 0.0:
+
                 self.t = 0.
                 # set self.__d_k_priv_t, self.__d_k_pub_t, self.__d_k_pub_t
-                self.__initialize_dkeff()
+                self.__initialize_dkeff(vul)
                 # set share of public damage
                 self.__share_pub_dam=self.__d_k_pub_t/L_pub
             # ignore hh that do  not have any capital stock anymore
@@ -358,14 +368,16 @@ class Household():
             self.__update_dinc(L, K)
             
             # determine recovery track
-            recovery_type, d_reco, rebuild=self.__get_recovery_path()
+            recovery_type, d_reco, rebuild = self.__get_recovery_path()
             
             # store the amount of capital stock that can be rebuild
             self.__rebuild = rebuild
             
             self.__update_dcons(d_reco)
 
+
             floor, tf= self.__smooth_with_savings_2(d_reco)
+            
             
             self.__update_dcons_sm(floor)
 
@@ -383,11 +395,11 @@ class Household():
  
         return
     
-    def __initialize_dkeff(self):
+    def __initialize_dkeff(self,vul):
         
-        self.__d_k_eff_t += (self.__k_eff_0 - self.__d_k_eff_t) * self.__vul
-        self.__d_k_priv_t += (self.__k_priv_0 - self.__d_k_priv_t) * self.__vul
-        self.__d_k_pub_t += (self.__k_pub_0 - self.__d_k_pub_t) * self.__vul
+        self.__d_k_eff_t += (self.__k_eff_0 - self.__d_k_eff_t) * vul
+        self.__d_k_priv_t += (self.__k_priv_0 - self.__d_k_priv_t) * vul
+        self.__d_k_pub_t += (self.__k_pub_0 - self.__d_k_pub_t) * vul
         
         return
     
@@ -407,8 +419,7 @@ class Household():
         return
     
     def __update_dcons(self, d_reco):
-        if self.hhid ==222:
-             print(d_reco)
+
         self.__d_con_priv_t = self.__d_inc_priv_t + d_reco
         self.__d_con_eff_t = self.__d_inc_t + d_reco
         
@@ -421,13 +432,6 @@ class Household():
         
         return
     
-    
-    def __set_pds(self):
-        
-        if PDS=='k_priv':
-            self.__sav_t += (self.__k_priv_0 - self.__d_k_priv_t) * self.__vul
-            
-        return
    
 
     def __get_reco_fee(self, damage=0, lmbda=0, t1=None, t2=None):
@@ -443,8 +447,7 @@ class Household():
 
             dam_0 = damage * np.e**(-t1*lmbda)
             dam_1 = damage * np.e**(-t2*lmbda)
-            if self.hhid ==222:
-                print(np.e**(-t2*lmbda))
+
         
         except IndexError:
             print(self.__hhid)
@@ -726,11 +729,16 @@ class Household():
         self.__d_k_priv_t -= self.__rebuild
         self.__d_k_pub_t = L_pub*self.__share_pub_dam
         
+        if self.hhid==1:
+            print('test')
+            print(self.__d_k_pub_t/(self.__d_k_pub_t + self.__d_k_priv_t +1))
+            
         
-        if self.__d_k_priv_t <=0:
+        
+        if self.__d_k_priv_t <=0.0:
             self.__d_k_priv_t=0.
             
-        if self.__d_k_pub_t <=0:
+        if self.__d_k_pub_t <=0.0:
             self.__d_k_pub_t=0.
             
         return
@@ -782,6 +790,9 @@ class Household():
         if (self.__d_con_priv_t < 0.005*self.__con_0) & (self.__sav_t<self.__sav_0):
             
             self.__sav_t += self.__sav_0/DT_STEP
+            
+            if self.__sav_t> self.__sav_0:
+                self.__sav_t= self.__sav_0
     
         elif (self.__d_con_priv_t > 0.005*self.__con_0) & (self.__sav_t> 0.0):
 
@@ -913,14 +924,16 @@ class Household():
     
     def __get_reco_from_lookup(self, vul):
         
-        lambdas= pd.read_csv('../data/data_lookup/lambdas.csv')
         
-        if vul < 0.001:
-            vul=0.001
+        
+        lambdas= pd.read_csv('/home/insauer/projects/STP/global_STP_paper/data/results/first_try/'+'lambdas_{}.csv'.format(COUNTRY))
+        
+        if vul < 0.0001:
+            vul=0.0001
         
         try:
 
-            lmbda=lambdas.loc[np.round(lambdas['vul'],3)==np.round(vul,3),'lmbda'].values[0]
+            lmbda=lambdas.loc[np.round(lambdas['vul'],4)==np.round(vul,4),'lmbda'].values[0]
             
         except IndexError:
             

@@ -47,10 +47,11 @@ class HHRegister():
     def region_hhs(self):
         return self.__region_hhs
 
-    def set_from_csv(self, work_path='/home/insauer/projects/WB_model/hhwb', path='/data/test_data.csv', id_col='fhhid', n_ind='n_individuals',
-                     weight_col='weight', vul_col='vul', income_col='income',
-                     income_sp='income_sp', region='region', decile='decile', savings='savings',
-                     subsistence_line=15926., ispoor=None, isurban=None):
+    def set_from_csv(self, work_path='/home/insauer/projects/WB_model/hhwb', path='/data/test_data.csv',
+                     file_name='', id_col='fhhid', n_ind=None,
+                     weight_col=None, vul_col=None, income_col=None,
+                     income_sp=None, region=None, decile=None, savings=None,
+                     subsistence_line=None, ispoor=None, isurban=None):
         """
         This function reads the household information from the FIES if it is given in a
         csv file. It provides the full list of household agents.
@@ -74,12 +75,12 @@ class HHRegister():
                            an urban or rural area
         """
         
-        with ZipFile(work_path + path, 'r') as zip_ref:
+        with ZipFile(path, 'r') as zip_ref:
             # Extract the CSV file to a temporary directory
-            zip_ref.extract('test_hh.csv', path='temp')
+            zip_ref.extract(file_name, path='temp')
         
 
-        data = pd.read_csv('temp/' + 'test_hh.csv')
+        data = pd.read_csv('temp/' + file_name)
         self.__n_hh = data.shape[0]
         self.__extract_meta_info(data, id_col)
 
@@ -90,15 +91,46 @@ class HHRegister():
             hh_data = data.iloc[hh, :]
             hh_id = hh_data[id_col]
             hh_w = hh_data[weight_col]
-            hh_vul = hh_data[vul_col]
+            
+            if vul_col:
+                
+                hh_vul = hh_data[vul_col]
+                vul_mode='hh'
+                
+            else:
+                hh_vul = None
+                vul_mode='hazard'
+            
             hh_inc = hh_data[income_col]
-            hh_inc_sp = hh_data[income_sp]
-
-            hh_reg = hh_data[region]
+            
+            if income_sp:
+                
+                hh_inc_sp = hh_data[income_sp]
+            else:
+                hh_inc_sp=0.
+                
+            if region:
+                hh_reg = hh_data[region]
+            else:
+                hh_reg = 'na'
+                
             hh_dec = hh_data[decile]
-            hh_sav = hh_data[savings]
-            hh_inds = hh_data[n_ind]
+            
+            if savings:
+                hh_sav = hh_data[savings]
+            else:
+                #hh_sav=0.1*hh_inc
+                hh_sav=0.
+                
+            if n_ind:
+                
+                hh_inds = hh_data[n_ind]
+                
+            else:
+                hh_inds = 1
+                
             hh_subsistence_line = subsistence_line * hh_inds
+            
             if ispoor:
                 hh_poor = hh_data[ispoor]
             else:
@@ -109,7 +141,7 @@ class HHRegister():
             else:
                 hh_urban = None
             """create the household agent"""
-            hh = Household(hhid=hh_id, n_inds=hh_inds, w=hh_w, vul=hh_vul, i_0=hh_inc, i_sp=hh_inc_sp,
+            hh = Household(hhid=hh_id, n_inds=hh_inds, w=hh_w, vul=hh_vul, vul_mode=vul_mode, i_0=hh_inc, i_sp=hh_inc_sp,
                            region=hh_reg, savings=hh_sav, subsistence_line=hh_subsistence_line, decile=hh_dec,
                            isurban=hh_urban, ispoor=hh_poor)
             #print(hhid)
@@ -121,13 +153,20 @@ class HHRegister():
         return
 
     def __extract_meta_info(self, data, id_col):
+        
+        try:
 
-        regions = list(set(data['region']))
+            regions = list(set(data['region']))
+    
+            for region in regions:
+    
+                hhids = list(data.loc[data['region'] == region, id_col])
+    
+                self.__region_hhs.update({region: hhids})
+                
+        except KeyError:
+            hhids = list(data[id_col])
 
-        for region in regions:
-
-            hhids = list(data.loc[data['region'] == region, id_col])
-
-            self.__region_hhs.update({region: hhids})
+            self.__region_hhs.update({'region': hhids})
 
         return

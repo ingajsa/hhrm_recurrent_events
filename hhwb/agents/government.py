@@ -9,6 +9,7 @@ Created on Sat Jun 27 21:41:02 2020
 import numpy as np
 import pandas as pd
 from hhwb.util.constants import  DT_STEP, TEMP_RES, DT, OPT_DYN, RHO
+
 #from misc.cluster_sim import PI
 
 AGENT_TYPE = 'GV'
@@ -20,7 +21,9 @@ ETA=pams['ETA'].values[0]
 SUBS_SAV_RATE=pams['SUBS_SAV_RATE'].values[0]/13.
 T_RNG=pams['T_RNG'].values[0]
 K_PUB=pams['K_PUB'].values[0]
-PDS=pams['PDS'].values[0]
+COUNTRY=pams['COUNTRY'].values[0]
+OUTPUT_DATA_PATH=pams['OUTPUT_DATA_PATH'].values[0]
+
 
 class Government():
 
@@ -201,7 +204,7 @@ class Government():
         self.__K_pub=K_PUB * self.__K
         self.__K_priv=(1-K_PUB) * self.__K
         
-        
+        print(self.__K_pub/(self.__K_pub+self.__K_priv))
         
         return
     
@@ -270,8 +273,8 @@ class Government():
         
         """gather all government relevant variables"""
         #self.__d_k_pub_t = 0.
-        self.__d_k_priv_t = 0.
         self.__d_con_eff_t = 0.
+        self.__d_k_priv_t = 0.
         self.__d_con_priv_t = 0.
         self.__d_inc_t = 0.
         self.__d_inc_sp_t = 0.
@@ -282,9 +285,8 @@ class Government():
         
         for hh in reg_hh:
             
-            #self.__d_k_pub_t += hh.weight* hh.d_k_pub_t
             self.__d_k_priv_t += hh.weight* hh.d_k_priv_t
-            self.__d_k_eff_t = self.__d_k_priv_t +  self.__d_k_pub_t
+
             self.__d_inc_t += hh.weight*hh.d_inc_t
             self.__d_inc_sp_t += hh.weight*hh.d_inc_sp_t
             self.__d_wb_t += hh.weight*hh.d_wb_t
@@ -293,6 +295,9 @@ class Government():
             self.__d_con_priv_t += hh.weight*hh.d_con_priv_t
             self.__d_con_eff_sm += hh.weight*hh.d_con_eff_sm
             self.__d_con_priv_sm += hh.weight*hh.d_con_priv_sm
+            
+        self.__d_k_eff_t = self.__d_k_priv_t + self.__d_k_pub_t
+        
         return
     
     def __set_shock_state(self, L, L_pub, K, aff_flag):
@@ -315,7 +320,7 @@ class Government():
             self.__d_k_eff_t = L
             self.__d_k_pub_t = L_pub
             self.__d_k_priv_t = L - L_pub
-            self.__add_pds_expenditure()
+            #self.__add_pds_expenditure()
             
         else:
             self.__d_k_eff_t = 0
@@ -339,12 +344,12 @@ class Government():
 
         return
     
-    def __add_pds_expenditure(self):
+    # def __add_pds_expenditure(self):
         
-        if PDS=='k_priv':
-            self.__pub_debt += self.__d_k_priv_t
+    #     if PDS=='k_priv':
+    #         self.__pub_debt += self.__d_k_priv_t
             
-        return
+    #     return
     
     def __optimize_reco(self, vul=0.3):
         """
@@ -449,9 +454,7 @@ class Government():
 
         dam_0 = self.__damage_pub[self.__c_shock] * np.e**(-t1*self.__lmbda[self.__c_shock])
         dam_1 = self.__damage_pub[self.__c_shock] * np.e**(-t2*self.__lmbda[self.__c_shock])
-        
-    
-        
+
         return dam_0-dam_1
     
     def __update_k_pub(self):
@@ -471,7 +474,7 @@ class Government():
     
     def __get_reco_from_lookup(self, vul):
         
-        lambdas= pd.read_csv('../data/data_lookup/lambdas.csv')
+        lambdas= pd.read_csv('/home/insauer/projects/STP/global_STP_paper/data/results/first_try/'+'lambdas_{}.csv'.format(COUNTRY))
         
         if vul < 0.001:
             vul=0.001
