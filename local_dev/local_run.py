@@ -6,7 +6,7 @@ Created on Wed Jan  5 16:53:44 2022
 @author: insauer
 """
 import sys
-sys.path.append('/home/insauer/projects/hhrm/hhrm_recurrent_events')
+#sys.path.append('/home/insauer/projects/hhrm/hhrm_recurrent_events')
 from hhwb.agents.government import Government
 from hhwb.agents.hh_register import HHRegister
 
