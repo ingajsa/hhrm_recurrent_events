@@ -6,51 +6,7 @@ Created on Wed Jan  5 16:53:44 2022
 @author: insauer
 """
 import sys
-import os
-import inspect
-import pandas as pd
-import numpy as np
-from hhwb.util.constants import  DT_STEP, TEMP_RES, DT, OPT_DYN, RHO
-
-run_type='test'
-
-# run_time (in 4-week steps)
-run_time=10
-
-#eta parameter in well-being
-ETA=1.5
-
-#level of subsistence line
-subsistence_line=15926
-
-# time horizon of optimization
-T_RNG= 15
-
-# productivity of capital stock
-PI=0.33
-
-# r minimum recovery_rate
-R = 3339
-
-# r minimum recovery_rate
-k_pub = 0.25
-
-
-
-
-"""save configuration of the run"""
-
-dirc=os.getcwd()
-
-params=pd.DataFrame(data={'PI':PI,
-                  'ETA':ETA,
-                  'SUBS_SAV_RATE':R,
-                  'T_RNG':T_RNG,
-                  'K_PUB':k_pub,
-                  'SUBSISTENCE_LINE':subsistence_line}, index=[0])
-
-params.to_csv('params.csv')
-
+sys.path.append('/home/insauer/projects/hhrm/hhrm_recurrent_events')
 from hhwb.agents.government import Government
 from hhwb.agents.hh_register import HHRegister
 
@@ -58,91 +14,80 @@ from hhwb.agents.shock import Shock
 from hhwb.application.climate_life import ClimateLife
 from hhwb.application.data_analysis import DataAnalysis
 
-
-""" Shock definition. This script coordinates a run of the household resilience model by setting 
-    data pathes according to the configuration of the run. The routine basically encompasses the
-    following steps:
-       - creating household agents
-       - create government agent 
-       - create shock agent
-       - set-up of the dynamic model
-       - running the dynamic model
-       - short analysis of the data
-"""
-
-
-
-
-work_path=os.path.abspath(os.path.join(os.pardir))
-cores=4
+if __name__ == "__main__":
+    print("Arguments received:", sys.argv)
     
-print('Number threads = ' + str(cores))
-hh_reg = HHRegister()
+    country=sys.argv[1]
+    subsistence_line=float(sys.argv[2])
+    output_data_path=sys.argv[3]
+    run_time=int(sys.argv[4])
+    work_path=sys.argv[5]
+    hh_path=sys.argv[6]
+    shock_path=sys.argv[7]
+    survey_file=sys.argv[8]
+    start_year=int(sys.argv[9])
+    cores=int(sys.argv[10])
 
-
-hh_path ='/data/test_hh/test_hh.zip'
+    """ Shock definition. This script coordinates a run of the household resilience model by setting 
+        data pathes according to the configuration of the run. The routine basically encompasses the
+        following steps:
+           - creating household agents
+           - create government agent 
+           - create shock agent
+           - set-up of the dynamic model
+           - running the dynamic model
+           - short analysis of the data
+    """
+    
+    
+        
+    print('Number threads = ' + str(cores))
     
     
     
-shock_path = '/data/test_shocks/test_shocks.zip'
+    hh_reg = HHRegister()
+    
+    
+    """ generates the household agents from a csv, the parameter correspond to the relevant column names"""
+    
+    hh_reg.set_from_csv(work_path=work_path, path=work_path+hh_path,  id_col='fhhid', weight_col='weight',
+                          income_col='income', file_name=survey_file,
+                          decile='decile', subsistence_line=subsistence_line)
+    # print('Households registered')
+    ## get number of registered households
+    
+    all_hhs = hh_reg.hh_list
+    
+    hh=all_hhs[0]
+    
+    
+    """ set up of the government agent """
+    
+    gov = Government()
+    gov.set_tax_rate(all_hhs)
+    
+    """ set up of the shock agent """
+    
+    fld = Shock()
+    fld.read_vul_shock(path=work_path+hh_path, output_path=work_path+output_data_path,
+                        file=survey_file, start_year=start_year)
+    
+    
+    """ set up dynamic modeling """
+    
+    cl = ClimateLife(all_hhs, fld, gov)
+    # cl.start(work_path=work_path, result_path='/data/output_'+args.run_name+'/',
+    #           cores=cores, reco_period=args.run_time)
+    
+    """ call of the dynamic modeling """
+    cl.start(work_path=work_path, result_path=work_path+output_data_path,
+              cores=cores, reco_period=run_time)
+    """ generate short data analysis"""
+    
+    
+    
+    da=DataAnalysis(work_path+hh_path, hh_file=survey_file, output_data_path=work_path+output_data_path, run_name='test')
+    
+    da.analyse_time(step=1000)
+    da.analyse_wb(step=1000)
 
-output_data_path=''
-
-
-""" generates the household agents from a csv, the parameter correspond to the relevant column names"""
-
-hh_reg.set_from_csv(work_path=work_path, path=hh_path, id_col='fhhid', n_ind = 'n_individuals', weight_col='weight',
-                      vul_col='vul', income_col='income', income_sp='income_sp', region='region',
-                      decile='decile', savings='savings', subsistence_line=subsistence_line,
-                      ispoor='ispoor', isurban='isurban')
-# print('Households registered')
-## get number of registered households
-
-all_hhs = hh_reg.hh_list
-
-hh=all_hhs[0]
-
-
-
-
-
-""" set up of the government agent """
-
-gov = Government()
-gov.set_tax_rate(all_hhs)
-
-""" set up of the shock agent """
-
-fld = Shock()
-fld.read_shock(work_path=work_path, path=shock_path,
-                event_identifier='-', run=run_type)
-
-# fld.generate_single_shocks(work_path=work_path,
-#                         path_haz='/data/output/shocks/shocks_99.csv',
-#                         path_hh='/data/survey_data/PHL/region_hh_full_pack_PHL_pop.csv',
-#                         path_hh_orig='/data/survey_data/PHL/survey_PHL.csv',
-#                         hh_reg=None, k_eff=0, seed=args.seed)
-
-# print('Shocks prepared')
-# print(fld.aff_ids)
-
-""" set up dynamic modeling """
-
-cl = ClimateLife(all_hhs, fld, gov)
-# cl.start(work_path=work_path, result_path='/data/output_'+args.run_name+'/',
-#           cores=cores, reco_period=args.run_time)
-
-""" call of the dynamic modeling """
-cl.start(work_path='', result_path='',
-          cores=cores, reco_period=run_time)
-
-""" generate short data analysis"""
-
-
-
-da=DataAnalysis(work_path+hh_path, shock_path, output_data_path='', column_id='', run_name=run_type)
-
-da.analyse_time(step=1000)
-da.analyse_wb(step=1000)
-
-#da.analyse_time_steps(step=10000)
