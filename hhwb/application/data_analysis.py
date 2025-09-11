@@ -138,30 +138,6 @@ class DataAnalysis():
             else:
                 add=step
                 
-        
-        """col=0
-        add=step
-
-        while add > 0:
-            print(col)
-            cols=np.arange(col,col+add)
-            df_cons=pd.read_csv(self.__output_data_path + 'cons.csv', usecols=cols, header=None)
-            df_cons_sm=pd.read_csv(self.__output_data_path + 'cons_sm.csv', usecols=cols, header=None)
-            df_wb=pd.read_csv(self.__output_data_path + 'wb.csv', usecols=cols, header=None)
-            df_wb_sm=pd.read_csv(self.__output_data_path + 'wb_sm.csv', usecols=cols, header=None)
-            for m in month:
-                
-                self.__hhs.loc[self.__hhs['fhhid'].isin(cols),'cons_{}'.format(str(m))]=np.array(df_cons.iloc[m,:])
-                self.__hhs.loc[self.__hhs['fhhid'].isin(cols),'cons_sm_{}'.format(str(m))]=np.array(df_cons_sm.iloc[m,:])
-                self.__hhs.loc[self.__hhs['fhhid'].isin(cols),'wb_{}'.format(str(m))]=np.array(df_wb.iloc[m,:])
-                self.__hhs.loc[self.__hhs['fhhid'].isin(cols),'wb_sm_{}'.format(str(m))]=np.array(df_wb_sm.iloc[m,:])
-                self.__hhs.loc[self.__hhs['fhhid'].isin(cols),'wb_inc_{}'.format(str(m))]=np.array(df_wb.diff().iloc[m+1,:])
-                self.__hhs.loc[self.__hhs['fhhid'].isin(cols),'wb_inc_sm_{}'.format(str(m))]=np.array(df_wb_sm.diff().iloc[m+1,:])
-            col+=add
-            if col+add>=self.__hhs.shape[0]:
-                add=self.__hhs.shape[0]-col
-            else:
-                add=step"""
             
         self.__hhs.to_csv(self.__output_data_path + 'hhs_'+self.__run_name+'_analysed.csv')
         
