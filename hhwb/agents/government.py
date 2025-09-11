@@ -23,7 +23,8 @@ T_RNG=pams['T_RNG'].values[0]
 K_PUB=pams['K_PUB'].values[0]
 COUNTRY=pams['COUNTRY'].values[0]
 OUTPUT_DATA_PATH=pams['OUTPUT_DATA_PATH'].values[0]
-
+LAMBDA_PATH=pams['LAMBDA_PATH'].values[0]
+LAMBDA_PRECISION=pams['LAMBDA_PRECISION'].values[0]
 
 class Government():
 
@@ -59,7 +60,7 @@ class Government():
         self.__L_0 = 0
         self.__vul = []
 
-        self.__lmbda = [0.]
+        self.__lmbda = 0.
 
         self.__L_t = 0.
         
@@ -231,6 +232,9 @@ class Government():
     def update_reco(self, hh_reg= None):
         
         self.__update_k_pub()
+        
+        if self.__d_k_pub_t <=0.0:
+            self.__d_k_pub_t=0.
 
         return
         
@@ -438,7 +442,26 @@ class Government():
         print('optimization failed')
         print(vul)
     
-    def __get_reco_fee(self, t1=None, t2=None):
+    # def __get_reco_fee(self, t1=None, t2=None):
+    #     """
+    #     Calculates the recovery spending for one timestep under exponential recovery.
+    #     Returns
+    #     -------
+    #     TYPE
+    #         recovery fee.
+    #     """
+    #     if not t1:
+    #         t1 = self.t
+
+    #     if not t2:
+    #         t2 = self.t + self.dt
+
+    #     dam_0 = self.__damage_pub[self.__c_shock] * np.e**(-t1*self.__lmbda[self.__c_shock])
+    #     dam_1 = self.__damage_pub[self.__c_shock] * np.e**(-t2*self.__lmbda[self.__c_shock])
+
+    #     return dam_0-dam_1
+    
+    def __get_reco_fee(self, damage=0, lmbda=0, t1=None, t2=None):
         """
         Calculates the recovery spending for one timestep under exponential recovery.
         Returns
@@ -446,15 +469,12 @@ class Government():
         TYPE
             recovery fee.
         """
-        if not t1:
-            t1 = self.t
+            
 
-        if not t2:
-            t2 = self.t + self.dt
+        dam_0 = damage * np.e**(-t1*lmbda)
+        dam_1 = damage * np.e**(-t2*lmbda)
 
-        dam_0 = self.__damage_pub[self.__c_shock] * np.e**(-t1*self.__lmbda[self.__c_shock])
-        dam_1 = self.__damage_pub[self.__c_shock] * np.e**(-t2*self.__lmbda[self.__c_shock])
-
+        
         return dam_0-dam_1
     
     def __update_k_pub(self):
@@ -465,29 +485,39 @@ class Government():
         
         opt_vul = self.__d_k_pub_t/self.__K_pub
         
+        print('pub opt_vul '+str(opt_vul))
+        
         self.__get_reco_from_lookup(opt_vul)
         
-        self.__d_k_pub_t -= self.__get_reco_fee()
-        self.__pub_debt += self.__get_reco_fee()
+        lmbda= self.__get_reco_from_lookup(opt_vul)
+        
+        print('lmbda '+ str(lmbda))
+        
+        self.__d_k_pub_t -= self.__get_reco_fee(damage=self.__d_k_pub_t,
+                                                        lmbda=lmbda, t1=0, t2=self.__dt)
+        self.__pub_debt += self.__get_reco_fee(damage=self.__d_k_pub_t,
+                                                        lmbda=lmbda, t1=0, t2=self.__dt)
         
         return
     
     def __get_reco_from_lookup(self, vul):
         
-        lambdas= pd.read_csv('/home/insauer/projects/STP/global_STP_paper/data/results/first_try/'+'lambdas_{}.csv'.format(COUNTRY))
+        lambdas= pd.read_csv(LAMBDA_PATH)
         
-        if vul < 0.001:
-            vul=0.001
+        if vul < 0.0001:
+            vul=0.0001
         
         try:
+            print('vul')
+            print(np.round(vul,LAMBDA_PRECISION))
 
-            self.__lmbda.append(lambdas.loc[np.round(lambdas['vul'],3)==np.round(vul,3),'lmbda'].values[0])
+            lmbda=lambdas.loc[np.round(lambdas['vul'],LAMBDA_PRECISION)==np.round(vul,LAMBDA_PRECISION),'lmbda'].values[0]
             
         except IndexError:
             
             print(np.round(vul,3))
         
-        return 
+        return lmbda
 
     # def _update_income_sp(self):
     #     self.__d_inc_sp_t = (self.__d_k_eff_t/self.__K) * self.__sp_cost
