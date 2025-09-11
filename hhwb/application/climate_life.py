@@ -5,7 +5,8 @@ Created on Sat Jun 27 21:19:13 2020
 
 @author: insauer
 """
-
+import os
+import zipfile
 import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -107,201 +108,149 @@ class ClimateLife():
 
     def start(self, work_path='/home/insauer/projects/WB_model/hhwb',
               result_path='/data/output/', cores=1, reco_period=0):
-        """main method that starts and controls the dynamic model
-        
-        Parameters
-        ----------
-        work_path : str
-            general path of the model
-        result_path : str
-            output path for results
-        cores : int
-            number of available threads used for multi-core processing
-        reco_period : TYPE
-            run time of the model in years
-    
-        Returns
-        -------
-        None. """
-        
-        print('Life started')
-        
-        
-        """set up of runtime and temporal resolution"""
-        pt = np.linspace(0, reco_period, reco_period*DT_STEP+1)
-        dt_reco = np.diff(pt)[0]
-        
-        self.__pt = pt[::4]
-        
-        self.__dt_life = np.arange(0, reco_period*DT_STEP+1)
-        
+        """
+        Main method that starts and controls the dynamic model.
+        """
+        print("Life started new")
+ 
+        # --- Setup temporal resolution ---
+        self._setup_time(reco_period)
 
-        #print('Tax rate: ' + str(self.__gov))
-        print('Total expenditure on social programs: ' + str(self.__gov.sp_cost))
-        print('Total national capital stock: ' + str(self.__gov.K))
-        
-        """"set up data storage"""
-        
-        colnames = np.arange(len(self.__hhs)).astype(str)
-        
-        keff = pd.DataFrame(columns=colnames)
-        kpub = pd.DataFrame(columns=colnames)
-        kpriv = pd.DataFrame(columns=colnames)
-        
-        ipub = pd.DataFrame(columns=colnames)
-        ipriv = pd.DataFrame(columns=colnames)
-        inc_ =  pd.DataFrame(columns=colnames)
-        inc_sp_ =  pd.DataFrame(columns=colnames)
-        cons_ =  pd.DataFrame(columns=colnames)
-        cons_priv_ = pd.DataFrame(columns=colnames)
-        cons_sm_ =  pd.DataFrame(columns=colnames)
-        cons_priv_sm_ =  pd.DataFrame(columns=colnames)
-        wb_ =  pd.DataFrame(columns=colnames)
-        wb_sm_ =  pd.DataFrame(columns=colnames)
-        sav_ =  pd.DataFrame(columns=colnames)
-        gov_ =  pd.DataFrame(columns=['kpub', 'kpriv', 'ipub', 'ipriv','inc', 'inc_sp', 'cons',
-                                      'cons_priv', 'cons_sm', 'cons_priv_sm', 'wb', 'wb_sm'])
-        
-        keff.to_csv(result_path+'keff.csv')
-        kpub.to_csv(result_path+'kpub.csv')
-        kpriv.to_csv(result_path+'kpriv.csv')
-        
-        ipub.to_csv(result_path+'ipub.csv')
-        ipriv.to_csv(result_path+'ipriv.csv')
-        
-        inc_.to_csv(result_path+'inc.csv')
-        inc_sp_.to_csv(result_path+'inc_sp.csv')
-        cons_.to_csv(result_path+'cons.csv')
-        cons_priv_.to_csv(result_path+'cons_priv.csv')
-        cons_sm_.to_csv(result_path+'cons_sm.csv')
-        cons_priv_sm_.to_csv(result_path+'cons_priv_sm.csv')
-        wb_.to_csv(result_path+'wb.csv')
-        wb_sm_.to_csv(result_path+'wb_sm.csv')
-        sav_.to_csv(result_path+'sav.csv')
-        gov_.to_csv(result_path+'gov.csv')
-        
+        # --- Display initial government info ---
+        print("Total expenditure on social programs:", self.__gov.sp_cost)
+        print("Total national capital stock:", self.__gov.K)
+
+        # --- Setup CSV writers and initial result files ---
+        writers = self._setup_results(result_path)
 
         n_shock = 0
+
+        # --- Main simulation loop ---
+        for t_i in self.__dt_life:
+            print(t_i)
+            print("Time step dt:", self.__dt_reco)
+
+            if t_i in self.__shock.time_stamps:
+                print("shock start")
+                self.__hhs = self.__shock.shock(n_shock, self.__gov, self.__hhs, self.__dt_reco, cores)
+                n_shock += 1
+            else:
+                self._recover_households(cores)
+
+            # Collect government info
+            self.__gov.collect_hh_info(t_i, self.__hhs)
+
+            # Update and write household & government records
+            self._write_records(t_i, writers)
+
+        # Close all CSV files
+        self._close_writers(writers, result_path)
+
+    # ---------------------- Helper Functions ---------------------- #
+
+    def _setup_time(self, reco_period):
+        """Set up model time steps and resolution."""
+        pt = np.linspace(0, reco_period, reco_period * DT_STEP + 1)
+        self.__dt_reco = np.diff(pt)[0]
+        self.__pt = pt[::4]
+        self.__dt_life = np.arange(0, reco_period * DT_STEP + 1)
+
+    def _setup_results(self, result_path):
+        """
+        Create CSV files and return a dictionary of CSV writers.
+        """
+        colnames = np.arange(len(self.__hhs)).astype(str)
+        files = {}
+        writers = {}
+
+        # Household-level files
+        hh_files = [
+            "keff", "kpub", "kpriv", "ipub", "ipriv",
+            "inc", "inc_sp", "cons", "cons_priv",
+            "cons_sm", "cons_priv_sm", "wb", "wb_sm", "sav"
+        ]
+        for fname in hh_files:
+            path = result_path + fname + ".csv"
+            f = open(path, "w", newline="")
+            writer = csv.writer(f)
+            files[fname] = f
+            writers[fname] = writer
+
+        # Government-level file
+        gov_path = result_path + "gov.csv"
+        f_gov = open(gov_path, "w", newline="")
+        writer_gov = csv.writer(f_gov)
+        files["gov"] = f_gov
+        writers["gov"] = writer_gov
+
+        return {"files": files, "writers": writers}
+
+    def _recover_households(self, cores):
+        """Update households during recovery period using multiprocessing."""
+        self.__gov.update_reco(self.__hhs)
+        p = mp.Pool(cores)
+        prod_x = partial(ClimateLife.update_reco, gov=self.__gov)
+        self.__hhs = p.map(prod_x, self.__hhs)
+        p.close()
+        p.join()
+
+    def _write_records(self, t_i, writers_dict):
+        """
+        Update household and government records for the current time step
+        and write them to CSV.
+        """
+        # Update household records
+        kpub, kpriv, ipub, ipriv, inc, inc_sp, cons, cons_priv, \
+        cons_sm, cons_priv_sm, wb, wb_sm, sav = self.__update_records(t_i)
+
+        # Update government results
+        gov_res = [
+            self.__gov.L_t, self.__gov.d_k_priv_t, self.__gov.L_pub_t,
+            self.__gov.d_inc_t, self.__gov.d_inc_sp_t,
+            self.__gov.d_con_priv_t, self.__gov.d_con_eff_t,
+            self.__gov.d_con_eff_sm, self.__gov.d_con_priv_sm,
+            self.__gov.d_wb_t, self.__gov.d_wb_sm, self.__gov.pub_debt
+        ]
+
+        writers = writers_dict["writers"]
+        # Write household data
+        writers["keff"].writerow(list(kpub))  # replaced doubled kpub
+        writers["kpub"].writerow(list(kpub))
+        writers["kpriv"].writerow(list(kpriv))
+        writers["ipub"].writerow(list(ipub))
+        writers["ipriv"].writerow(list(ipriv))
+        writers["inc"].writerow(list(inc))
+        writers["inc_sp"].writerow(list(inc_sp))
+        writers["cons"].writerow(list(cons))
+        writers["cons_priv"].writerow(list(cons_priv))
+        writers["cons_sm"].writerow(list(cons_sm))
+        writers["cons_priv_sm"].writerow(list(cons_priv_sm))
+        writers["wb"].writerow(list(wb))
+        writers["wb_sm"].writerow(list(wb_sm))
+        writers["sav"].writerow(list(sav))
+        # Write government data
+        writers["gov"].writerow(gov_res)
         
+    def _close_writers(self, writers_dict, result_path=None, zip_name="results.zip"):
+        """Close all CSV files and optionally compress them into a ZIP file."""
+        # Close all open files
+        for f in writers_dict["files"].values():
+            f.close()
+    
+        # Compress CSV files into a zip archive if result_path is provided
+        if result_path:
+            zip_path = os.path.join(result_path, zip_name)
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for fname in writers_dict["files"]:
+                    file_path = os.path.join(result_path, fname + ".csv")
+                    if os.path.exists(file_path):
+                        zipf.write(file_path, arcname=fname + ".csv")
+                        os.remove(file_path)
+            print(f"All results compressed into {zip_path}")
         
-        with open(result_path+'keff.csv', 'w', newline='') as f_keff,\
-             open(result_path+'kpub.csv', 'w', newline='') as f_kpub,\
-             open(result_path+'kpriv.csv', 'w', newline='') as f_kpriv,\
-             open(result_path+'cons_priv.csv', 'w', newline='') as f_cons_priv,\
-             open(result_path+'cons_priv_sm.csv', 'w', newline='') as f_cons_priv_sm,\
-             open(result_path+'cons_sm.csv', 'w', newline='') as f_cons_sm,\
-             open(result_path+'cons.csv', 'w', newline='') as f_cons,\
-             open(result_path+'wb.csv', 'w', newline='') as f_wb,\
-             open(result_path+'ipub.csv', 'w', newline='') as f_ipub,\
-             open(result_path+'ipriv.csv', 'w', newline='') as f_ipriv,\
-             open(result_path+'inc.csv', 'w', newline='') as f_inc,\
-             open(result_path+'inc_sp.csv', 'w', newline='') as f_inc_sp,\
-             open(result_path+'wb_sm.csv', 'w', newline='') as f_wb_sm,\
-             open(result_path+'sav.csv', 'w', newline='') as f_sav,\
-             open(result_path+'gov.csv', 'w', newline='') as f_gov:
-                 
-                 
-                 # open(work_path+result_path+'cons.csv', 'w', newline='') as f_cons,\
-                 
-            writer_keff=csv.writer(f_keff, delimiter=',')
-            writer_kpub=csv.writer(f_kpub, delimiter=',')
-            writer_kpriv=csv.writer(f_kpriv, delimiter=',')
-            
-            writer_ipub=csv.writer(f_ipub, delimiter=',')
-            writer_ipriv=csv.writer(f_ipriv, delimiter=',')
-            
-            writer_inc=csv.writer(f_inc, delimiter=',')
-            writer_incsp=csv.writer(f_inc_sp, delimiter=',')
-            
-            writer_cons = csv.writer(f_cons, delimiter=',')
-            writer_cons_sm = csv.writer(f_cons_sm, delimiter=',')
-            writer_cons_priv = csv.writer(f_cons_priv, delimiter=',')
-            writer_cons_priv_sm = csv.writer(f_cons_priv_sm, delimiter=',')
-            
-            writer_wb=csv.writer(f_wb, delimiter=',')
-            writer_wb_sm=csv.writer(f_wb_sm, delimiter=',')
-            writer_sav=csv.writer(f_sav, delimiter=',')
-            writer_gov=csv.writer(f_gov, delimiter=',')
-            
-            for t_i in self.__dt_life:
-                print(t_i)
-                print(dt_reco)
     
-                if t_i in self.__shock.time_stemps:
-                    print('shock start')
-                    self.__hhs = self.__shock.shock(n_shock, self.__gov, self.__hhs, dt_reco, cores)
-                    n_shock += 1
-                    #dt_s = 0
-                
-                else:
-                    self.__gov.update_reco(self.__hhs)
-                    p = mp.Pool(cores)
-                    prod_x=partial(ClimateLife.update_reco, gov=self.__gov)
-                    self.__hhs=p.map(prod_x, self.__hhs)
-                    p.close()
-                    p.join()
-                    
-                self.__gov.collect_hh_info(t_i, self.__hhs)
-    
-                kpub, kpriv, ipub, ipriv, inc, inc_sp, cons, cons_priv, cons_sm, cons_priv_sm, wb, wb_sm, sav = self.__update_records(t_i)
-                
-                
-                gov_res = [self.__gov.L_t, self.__gov.d_k_priv_t, self.__gov.L_pub_t, self.__gov.d_inc_t,
-                           self.__gov.d_inc_sp_t, self.__gov.d_con_priv_t, self.__gov.d_con_eff_t,
-                           self.__gov.d_con_eff_sm, self.__gov.d_con_priv_sm,
-                           self.__gov.d_wb_t, self.__gov.d_wb_sm, self.__gov.pub_debt]
-                
 
-                writer_keff.writerow(list(kpub+kpub))
 
-                writer_kpub.writerow(list(kpub))
-                writer_kpriv.writerow(list(kpriv))
-                
-                writer_ipub.writerow(list(ipub))
-                writer_ipriv.writerow(list(ipriv))
-                
-                writer_inc.writerow(list(inc))
-                writer_incsp.writerow(list(inc_sp))
-
-                writer_cons.writerow(list(cons))
-                
-                writer_cons_sm.writerow(list(cons_sm))
-                writer_cons_priv.writerow(list(cons_priv))
-                writer_cons_priv_sm.writerow(list(cons_priv_sm))
-                
-                writer_wb.writerow(list(wb))
-                writer_wb_sm.writerow(list(wb_sm))
-                writer_sav.writerow(list(sav))
-                writer_gov.writerow(gov_res)
-            
-            f_keff.close()
-            f_kpub.close()
-            f_kpriv.close()
-            f_ipub.close()
-            f_ipriv.close()
-            f_inc.close()
-            f_inc_sp.close()
-            f_cons.close()
-            f_cons_priv.close()
-            f_cons_sm.close()
-            f_cons_priv_sm.close()
-            f_wb.close()
-            f_wb_sm.close()
-            f_sav.close()
-            f_gov.close()
-    
-                # self.__plot_info(n_plot_hhs=5, plot_hhs=plot_ids)
-    
-                # if t_i%12 ==0:
-                #     #plt.tight_layout()
-                #     plt.show(block=False)
-                #     plt.pause(0.01)
-        return
-
-    def _set_agents(self):
-
-        return
-    
     def __get_plot_hhs(self, n_plot_hhs=10):
         
         sort_aff = np.argsort(self.__shock.aff_ids.sum(axis=1))
