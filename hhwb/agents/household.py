@@ -23,7 +23,8 @@ T_RNG=pams['T_RNG'].values[0]
 K_PUB=pams['K_PUB'].values[0]
 COUNTRY=pams['COUNTRY'].values[0]
 OUTPUT_DATA_PATH=pams['OUTPUT_DATA_PATH'].values[0]
-
+LAMBDA_PATH=pams['LAMBDA_PATH'].values[0]
+LAMBDA_PRECISION=pams['LAMBDA_PRECISION'].values[0]
 
 AGENT_TYPE = 'HH'
 
@@ -544,181 +545,6 @@ class Household():
         else:
             return -1
 
-    def __update_reco_spend(self):
-        """
-        Checks whether a household enters a new recovery mode and calculates the recovery spending
-        in the timestep.
-
-        """
-        
-        if self.__recovery_type == 0:
-            self.__recovery_spending = 0.
-            return
-        # exponential recovery 
-        if self.__recovery_type == 1:
-            # only use this for an optimization in each timestep
-            if OPT_DYN:
-                opt_vul = self.__d_k_priv_t / self.__k_priv_0
-
-                self.t = 0.
-
-                lmbda= self.__get_reco_from_lookup(vul=opt_vul)
-                #self.__optimize_reco(vul=opt_vul)
-                self.__cnt_ts += 1
-                self.__recovery_spending = self.__get_reco_fee(damage=self.__d_k_priv_t,
-                                                               lmbda=lmbda)
-
-            else:
-                # get recovery spending
-                self.__recovery_spending = self.__get_reco_fee()
-            return
-        
-        # recovery along the subsistence line
-            
-        if self.__recovery_type == 2:
-
-            opt_vul = self.__d_k_priv_t / self.__k_priv_0
-
-            #self.__optimize_reco(vul=opt_vul)
-            lmbda=self.__get_reco_from_lookup(vul=opt_vul)
-
-            # get recovery spending of exponential recovery
-            optimal_recovery_spending = self.__get_reco_fee(damage=self.__d_k_priv_t, lmbda=lmbda)
-            # check if exponential recovery is possible
-            if self.__check_subs(optimal_recovery_spending) > 0:
-                # enter exponential recovery track
-                self.__recovery_type = 1
-                
-                self.__recovery_spending = optimal_recovery_spending
-
-            else:
-                # remain in mode 2
-                # get possible recovery spending
-                if self.__possible_reco() == -1:
-                    self.__recovery_type = 4
-                    if self.__d_k_priv_t <= 0:
-                        self.__recovery_spending = 0
-                        self.__recovery_type = 0
-                        return
-                    # check if required recovery spending is smaller than the basic rate
-                    elif self.__d_k_priv_t < SUBS_SAV_RATE:
-                        self.__recovery_spending = self.__d_k_priv_t
-                    else:
-                        self.__recovery_spending = SUBS_SAV_RATE
-                    return
-                else:
-                    self.__recovery_spending = self.__possible_reco() + SUBS_SAV_RATE
-                    
-                    # get the consumption after smoothing 
-                    
-            return
-        # recovery below subsistence line (subsistence hh)
-        if self.__recovery_type == 3:
-            # check if household has already fully recovered
-            if self.__d_k_priv_t <= 0:
-                self.__recovery_spending = 0
-                self.__recovery_type = 0
-                return
-            # check if required recovery spending is smaller than the basic rate
-            elif self.__d_k_priv_t < SUBS_SAV_RATE:
-                self.__recovery_spending = self.__d_k_priv_t
-            else:
-                self.__recovery_spending = SUBS_SAV_RATE
-            return
-        # recovery starting below subsistence line
-        if self.__recovery_type == 4:
-            # check if recovery from own resources is possible
-            if self.__possible_reco() > 0:
-                # if possible enter mode 2
-                self.t = 0.
-                self.__recovery_type = 2
-                self.__recovery_spending = self.__possible_reco() + SUBS_SAV_RATE
-            else:
-                # same procedure as in mode 3
-                if self.__d_k_priv_t <= 0:
-                    self.__recovery_spending = 0
-                    self.__recovery_type = 0
-                    return
-
-                if self.__d_k_priv_t < SUBS_SAV_RATE:
-                    self.__recovery_spending = self.__d_k_priv_t
-                
-                else:
-                    self.__recovery_spending = SUBS_SAV_RATE
-        return
-
-
-
-    def __update_consum(self):
-        """
-        Update consumption.
-
-        """
-        #if not self.__poverty_trap:
-        # check for changes in the recovery track
-        self.__update_reco_spend()
-        # exponential recovery (or no recovery)
-
-            
-        
-        if self.__recovery_type < 2:
-            # calculate consumption loss
-            self.__d_con_eff_t = self.__d_inc_t + self.__recovery_spending
-            self.__d_con_priv_t = self.__d_inc_priv_t + self.__recovery_spending
-
-            if self.__recovery_type == 1:
-                self.__smooth_with_savings_2()
-                if self.t <= self.__tf:
-                    
-                    self.__d_con_priv_sm = self.__floor
-                    self.__d_con_eff_sm = self.__floor + self.__d_inc_sp_t + self.__d_inc_pub_t
-                else:
-                    self.__d_con_priv_sm = self.__d_con_priv_t
-                    self.__d_con_eff_sm = self.__d_con_eff_t
-            else:
-                
-                self.__d_con_eff_sm = self.__d_con_eff_t
-                self.__d_con_priv_sm = self.__d_con_priv_t
-                
-        elif self.__recovery_type == 2:
-            self.__d_con_eff_t = self.__d_inc_t + self.__possible_reco()
-            self.__d_con_priv_t = self.__d_inc_priv_t + self.__possible_reco()
-            
-            self.__smooth_with_savings_2()
-            
-            if self.t <= self.__tf:
-                
-                self.__d_con_priv_sm = self.__floor
-                self.__d_con_eff_sm = self.__floor + self.__d_inc_sp_t + self.__d_inc_pub_t
-            else:
-                self.__d_con_eff_sm = self.__d_con_eff_t
-                self.__d_con_priv_sm = self.__d_con_priv_t
-        else:
-            
-            self.__d_con_eff_t = self.__d_inc_t
-            self.__d_con_priv_t = self.__d_inc_priv_t
-            self.__smooth_with_savings_3()
-            
-            if self.t <= self.__tf:
-                
-                self.__d_con_priv_sm = self.__floor
-                self.__d_con_eff_sm = self.__floor + self.__d_inc_sp_t + self.__d_inc_pub_t
-                
-            else:
-                self.__d_con_eff_sm = self.__d_con_eff_t
-                self.__d_con_priv_sm = self.__d_inc_priv_t
-    
-        if self.__d_con_eff_t <0:
-            self.__d_con_eff_t=0
-            self.__recovery_spending = 0.
-            self.__recovery_type = 0
-        
-        if self.__d_con_priv_sm <0:
-            self.__d_con_priv_t=0
-            self.__recovery_spending = 0.
-            self.__recovery_type = 0
-
-        return
 
     def __update_k(self, L_pub=0., K_pub=0.):
         """
@@ -893,51 +719,24 @@ class Household():
   
         return floor, tf
     
-    # def __smooth_with_savings_3(self):
-    #     """Sets the floor taken from savings to smoothen HH's consumption
-    #     loss and the time tf when it runs out of savings under recovery mode 3
-    #     """
-    #     # check whether there are savings available
-    #     if self.__sav_t <= 0:
-    #         self.__floor = self.__d_con_priv_t
-    #         self.__tf = 0.0
-    #         return
-
-    #     dc0 = self.__d_con_priv_t
-
-
-    #     f = dc0 - np.sqrt(2 * self.__sav_t*SUBS_SAV_RATE/DT_STEP*PI*(1-self.__tax_rate))
-        
-    #     self.__floor=f+(SUBS_SAV_RATE/DT_STEP)/2.
-        
-    #     if self.__floor > dc0:
-    #         self.floor= dc0
-
-    #     self.__tf = (dc0 - self.__floor)/(SUBS_SAV_RATE*PI*(1-self.__tax_rate))
-
-    #     if self.__floor < 0:
-    #         self.__floor = 0.
-    #         self.__tf = (dc0 - self.__floor)/(SUBS_SAV_RATE*PI*(1-self.__tax_rate))
-            
-    #     return
     
     
     def __get_reco_from_lookup(self, vul):
         
         
-        
-        lambdas= pd.read_csv('/home/insauer/projects/STP/global_STP_paper/data/results/first_try/'+'lambdas_{}.csv'.format(COUNTRY))
+        lambdas= pd.read_csv(LAMBDA_PATH)
         
         if vul < 0.0001:
             vul=0.0001
-        
+            
+
         try:
 
-            lmbda=lambdas.loc[np.round(lambdas['vul'],4)==np.round(vul,4),'lmbda'].values[0]
+            lmbda=lambdas.loc[np.round(lambdas['vul'],LAMBDA_PRECISION)==np.round(vul,LAMBDA_PRECISION),'lmbda'].values[0]
             
         except IndexError:
             
-            print(np.round(vul,3))
+            print(np.round(vul,LAMBDA_PRECISION))
         
         return lmbda
 
