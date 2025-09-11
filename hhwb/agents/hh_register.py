@@ -119,8 +119,8 @@ class HHRegister():
             if savings:
                 hh_sav = hh_data[savings]
             else:
-                #hh_sav=0.1*hh_inc
-                hh_sav=0.
+                hh_sav=0.1*hh_inc
+                #hh_sav=0.
                 
             if n_ind:
                 
