@@ -199,6 +199,7 @@ class Government():
             hh.set_tax_rate(self.__tax_rate)
             hh.init_life()
             self.__K += hh.weight*hh.k_eff_0
+
             k_pub+=hh.weight*hh.k_pub_0
             k_priv+=hh.weight*hh.k_priv_0
         

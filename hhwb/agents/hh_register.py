@@ -103,6 +103,7 @@ class HHRegister():
             
             hh_inc = hh_data[income_col]
             
+            
             if income_sp:
                 
                 hh_inc_sp = hh_data[income_sp]

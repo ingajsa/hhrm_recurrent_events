@@ -6,7 +6,7 @@ Created on Wed Jan  5 16:53:44 2022
 @author: insauer
 """
 import sys
-#sys.path.append('/home/insauer/projects/hhrm/hhrm_recurrent_events')
+sys.path.append('/home/insauer/projects/hhrm/hhrm_recurrent_events')
 from hhwb.agents.government import Government
 from hhwb.agents.hh_register import HHRegister
 
@@ -50,7 +50,7 @@ if __name__ == "__main__":
     
     """ generates the household agents from a csv, the parameter correspond to the relevant column names"""
     
-    hh_reg.set_from_csv(work_path=work_path, path=work_path+hh_path,  id_col='fhhid', weight_col='weight',
+    hh_reg.set_from_csv(work_path=work_path, path=hh_path,  id_col='fhhid', weight_col='weight',
                           income_col='income', file_name=survey_file,
                           decile='decile', subsistence_line=subsistence_line)
     # print('Households registered')
@@ -66,10 +66,13 @@ if __name__ == "__main__":
     gov = Government()
     gov.set_tax_rate(all_hhs)
     
+    print(gov.K_pub)
+    
+    
     """ set up of the shock agent """
     
     fld = Shock()
-    fld.read_vul_shock(path=work_path+hh_path, output_path=work_path+output_data_path,
+    fld.read_vul_shock(path=hh_path, output_path=output_data_path,
                         file=survey_file, start_year=start_year)
     
     
@@ -80,14 +83,14 @@ if __name__ == "__main__":
     #           cores=cores, reco_period=args.run_time)
     
     """ call of the dynamic modeling """
-    cl.start(work_path=work_path, result_path=work_path+output_data_path,
+    cl.start(work_path=work_path, result_path=output_data_path,
               cores=cores, reco_period=run_time)
     """ generate short data analysis"""
     
     
     
-    da=DataAnalysis(work_path+hh_path, hh_file=survey_file, output_data_path=work_path+output_data_path, run_name='test')
+    # da=DataAnalysis(hh_path, hh_file=survey_file, output_data_path=output_data_path, run_name='test')
     
-    da.analyse_time(step=1000)
-    da.analyse_wb(step=1000)
+    # da.analyse_time(step=1000)
+    # da.analyse_wb(step=1000)
 
