@@ -243,7 +243,7 @@ class Shock():
         date_pattern = re.compile(r'\b\d{4}-\d{2}-\d{2}\b')
     
         # Fixed reference date for calculating offsets
-        reference_date = datetime.strptime("2000-01-01", "%Y-%m-%d")
+        reference_date = datetime.strptime(f"{str(start_date)}-01-01", "%Y-%m-%d")
     
         # List to collect converted time steps
         date_differences = []
