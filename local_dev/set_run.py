@@ -18,7 +18,7 @@ country='PHL'
 
 work_path=os.path.abspath(os.path.join(os.pardir, os.pardir))
 
-output_data_path='/example_output/'
+output_data_path=os.path.join(work_path, 'example_output/')
 
 hh_path ='/hhrm_recurrent_events/data/global_test/forcing_{}_120as.zip'.format(country)
     
@@ -72,15 +72,15 @@ params=pd.DataFrame(data={'PI':PI,
                   'T_RNG':T_RNG,
                   'K_PUB':k_pub,
                   'COUNTRY': country,
-                  'OUTPUT_DATA_PATH': work_path+output_data_path,
+                  'OUTPUT_DATA_PATH': output_data_path,
                   'LAMBDA_PATH': work_path+lambda_path,
                   'LAMBDA_PRECISION': lambda_precision,
                   'SUBSISTENCE_LINE':subsistence_line}, index=[0])
 
-if not os.path.exists(work_path+output_data_path):
+if not os.path.exists(output_data_path):
     os.makedirs(output_data_path)
 
-params.to_csv(work_path+output_data_path+'params.csv')
+params.to_csv(output_data_path+'params.csv')
 params.to_csv('params.csv')
 
 # Run script with arguments
