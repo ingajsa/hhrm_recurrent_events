@@ -58,7 +58,7 @@ if __name__ == "__main__":
     
     all_hhs = hh_reg.hh_list
     
-    hh=all_hhs[0]
+    hh = all_hhs[0]
     
     
     """ set up of the government agent """
@@ -72,7 +72,7 @@ if __name__ == "__main__":
     """ set up of the shock agent """
     
     fld = Shock()
-    fld.read_vul_shock(path=hh_path, output_path=output_data_path,
+    fld.read_vul_shock(path=work_path+hh_path, output_path=output_data_path,
                         file=survey_file, start_year=start_year)
     
     

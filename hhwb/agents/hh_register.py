@@ -75,7 +75,7 @@ class HHRegister():
                            an urban or rural area
         """
         
-        with ZipFile(path, 'r') as zip_ref:
+        with ZipFile(work_path + path, 'r') as zip_ref:
             # Extract the CSV file to a temporary directory
             zip_ref.extract(file_name, path='temp')
         
