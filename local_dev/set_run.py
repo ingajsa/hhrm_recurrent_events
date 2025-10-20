@@ -12,7 +12,7 @@ import subprocess
 
 
 
-country='PHL'
+country='CHN'
 
 """Parameters to adjust"""
 
@@ -20,13 +20,13 @@ work_path=os.path.abspath(os.path.join(os.pardir, os.pardir))
 
 output_data_path=os.path.join(work_path, 'example_output/')
 
-hh_path ='/hhrm_recurrent_events/data/global_test/forcing_{}_120as.zip'.format(country)
+hh_path ='/hhrm_recurrent_events/data/china_test/forcing_{}_120as.zip'.format(country)
     
-shock_path = '/hhrm_recurrent_events/data/global_test/forcing_{}_120as.zip'.format(country)
+shock_path = '/hhrm_recurrent_events/data/china_test/forcing_{}_120as.zip'.format(country)
 
 survey_file='forcing_{}_120as.csv'.format(country)
 
-lambda_path='/hhrm_recurrent_events/data/global_test/lambdas_{}.csv'.format(country)
+lambda_path='/hhrm_recurrent_events/data/china_test/lambdas_{}.csv'.format(country)
 
 start_year=2000
 
@@ -52,9 +52,7 @@ T_RNG= 15
 #k_pub = 0.25
 
 
-cnt_params=pd.read_csv('/home/insauer/projects/STP/global_STP_paper/'+
-                       'data/parameters/forcing_param_countries/'+
-                       'parameters_{}.csv'.format(country))
+cnt_params=pd.read_csv(work_path+'/hhrm_recurrent_events/data/china_test/parameters_{}.csv'.format(country))
 
 PI=cnt_params['PI'].values[0]
 
