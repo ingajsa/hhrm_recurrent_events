@@ -337,7 +337,8 @@ class Shock():
         )
     
         # Save aggregated shocks
-        os.makedirs(output_path, exist_ok=True)
+        if output_path !='':
+            os.makedirs(output_path, exist_ok=True)
         shock_df.to_csv(os.path.join(output_path, "shocks_aggregated.csv"), index=False)
     
         return
