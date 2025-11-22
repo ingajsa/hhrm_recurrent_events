@@ -62,15 +62,12 @@ sys.dont_write_bytecode = True
 
 # shock_files
 
-input_folder='/p/projects/ebm/inga/tipESM/data/tc_input/PHL'
 
 runs=np.arange(25)
 
-folders=os.listdir(input_folder)
-
 country='PHL'
 
-forcing_folder = Path("/p/projects/ebm/inga/tipESM/test_forcing")
+forcing_folder = Path("/p/projects/ebm/inga/tipESM/final_forcing/forcing_run_20")
 
 
 def schedule_run(flag,
@@ -123,8 +120,8 @@ def schedule_run(flag,
             "notification": "END,FAIL,TIME_LIMIT" if args.notify else "FAIL,TIME_LIMIT",
             "comment": "%s/%s" % (os.getcwd(), run_label),
             "environment": "ALL",
-            "executable": '/p/projects/ebm/inga/tipESM/cluster_model.py',
-            "options": " --country %s --run_name %s --file_name %s --output_data_path %s --work_path %s --hh_path %s --shock_path %s --survey_file %s start_year %i"%(country, run_name, file_name, output_data_path, work_path, hh_path, shock_path, survey_file, start_year),
+            "executable": '/p/projects/ebm/inga/hhrm/hhrm_recurrent_events/misc/cluster_model.py',
+            "options": " --country %s --file_name %s --work_path %s --hh_path %s --shock_path %s --survey_file %s --start_year %i"%(country, file_name, work_path, hh_path, shock_path, survey_file, start_year),
             "num_threads": args.threads,
             "mem_per_cpu": args.mem_per_cpu if not args.largemem else 15360,   # if mem_per_cpu is larger than MaxMemPerCPU then num_threads is reduced
             "other": "" if args.largemem else ""
@@ -140,6 +137,7 @@ def schedule_run(flag,
 #SBATCH --output=output.txt
 #SBATCH --error=errors.txt
 #SBATCH --export=%(environment)s
+#SBATCH --exclude=$(cat /p/projects/ebm/inga/dead_nodes.txt | tr -d "\n" | tr ":" ",")
 #SBATCH --mail-type=%(notification)s
 #SBATCH --%(node_usage)s
 #SBATCH --account=ebm
@@ -207,12 +205,12 @@ for filename in os.listdir(forcing_folder):
         run_name= f'{filename[:-4]}'
 
         
-        hh_data=pd.read_csv(hh_path)
+        hh_data=pd.read_csv(hh_path, compression='zip')
         
         start_year=get_time_period(hh_data)
         
 
-        survey_file=f'{filename[:-4]}.csv'
+        survey_file=f'model_forcing_{filename[:-4]}.csv'
 
 
         

@@ -12,6 +12,8 @@ sys.path.append('/p/projects/ebm/inga/hhrm/hhrm_recurrent_events')
 import psutil
 import argparse
 import pandas as pd
+import zipfile
+import os
 
 parser = argparse.ArgumentParser(
     description='run hhwb for different shock series')
@@ -26,9 +28,6 @@ parser.add_argument(
     '--file_name', type=str, default='shocks',
     help='run type')
 
-parser.add_argument(
-    '--out_put_data_path', type=str, default='',
-    help='run time in years')
 
 parser.add_argument(
     '--work_path', type=str, default='',
@@ -43,11 +42,11 @@ parser.add_argument(
     help='parameter indicating level of subsistence')
 
 parser.add_argument(
-    '--survey_file', type=float, default='',
+    '--survey_file', type=str, default='',
     help='productivity of capital stock')
 
 parser.add_argument(
-    '--start_year', type=int, default=200,
+    '--start_year', type=int, default=2000,
     help='time horizon of optimization')
 
 
@@ -95,8 +94,8 @@ params=pd.DataFrame(data={'PI':PI,
                   'T_RNG':T_RNG,
                   'K_PUB':k_pub,
                   'COUNTRY': args.country,
-                  'OUTPUT_DATA_PATH': args.output_data_path,
-                  'LAMBDA_PATH': args.work_path+args.lambda_path,
+                  'OUTPUT_DATA_PATH': '',
+                  'LAMBDA_PATH': args.work_path+ lambda_path,
                   'LAMBDA_PRECISION': lambda_precision,
                   'SUBSISTENCE_LINE':subsistence_line}, index=[0])
 
@@ -160,7 +159,7 @@ if __name__ == "__main__":
     """ set up of the shock agent """
     
     fld = Shock()
-    fld.read_vul_shock(path=args.hh_path, output_path=args.output_data_path,
+    fld.read_vul_shock(path=args.hh_path, output_path='',
                         file=args.survey_file, start_year=args.start_year)
     
     
@@ -171,9 +170,28 @@ if __name__ == "__main__":
     #           cores=cores, reco_period=args.run_time)
     
     """ call of the dynamic modeling """
-    cl.start(work_path=args.work_path, result_path=args.output_data_path,
+    cl.start(work_path=args.work_path, result_path='',
               cores=cores, reco_period=run_time)
     """ generate short data analysis"""
+    
+    
+
+    # Get the current directory name and path
+    current_dir = os.getcwd()
+    parent_dir = os.path.dirname(current_dir)
+    zip_filename = os.path.basename(current_dir) + ".zip"
+    zip_path = os.path.join(parent_dir, zip_filename)
+    
+    # Create the zip file
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for root, dirs, files in os.walk(current_dir):
+            for file in files:
+                file_path = os.path.join(root, file)
+                # Store relative paths to avoid absolute paths in the zip
+                arcname = os.path.relpath(file_path, start=current_dir)
+                zipf.write(file_path, arcname)
+    
+    print(f"✅ Folder compressed into: {zip_path}")
     
     
     
