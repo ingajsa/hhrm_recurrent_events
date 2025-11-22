@@ -108,7 +108,7 @@ class HHRegister():
                 
                 hh_inc_sp = hh_data[income_sp]
             else:
-                hh_inc_sp=0.
+                hh_inc_sp=0.15
                 
             if region:
                 hh_reg = hh_data[region]
