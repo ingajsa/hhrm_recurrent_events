@@ -65,9 +65,9 @@ sys.dont_write_bytecode = True
 
 runs=np.arange(25)
 
-country='PHL'
+country='CHN'
 
-forcing_folder = Path("/p/projects/ebm/inga/tipESM/final_forcing/forcing_run_20")
+forcing_folder = Path("/p/projects/ebm/inga/china_hhrm_forcing/final_forcing/forcing_run_0")
 
 
 def schedule_run(flag,
