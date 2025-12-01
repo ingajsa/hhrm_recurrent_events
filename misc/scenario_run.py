@@ -172,7 +172,6 @@ if num > 1:
             exit("Aborted")
 
 
-country='PHL'
 
 
 # r minimum recovery_rate

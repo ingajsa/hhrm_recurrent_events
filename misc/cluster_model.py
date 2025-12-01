@@ -70,11 +70,11 @@ subsistence_line=2.15*365
 # time horizon of optimization
 T_RNG= 15
 
-lambda_path='/hhrm_recurrent_events/data/global_test/lambdas_{}.csv'.format(args.country)
+lambda_path='/hhrm_recurrent_events/data/china_test/lambdas_{}.csv'.format(args.country)
 
 
 
-cnt_params=pd.read_csv('/p/projects/ebm/inga/hhrm/hhrm_recurrent_events/data/global_test/parameters_{}.csv'.format(args.country))
+cnt_params=pd.read_csv('/p/projects/ebm/inga/hhrm/hhrm_recurrent_events/data/china_test/parameters_{}.csv'.format(args.country))
 
 PI=cnt_params['PI'].values[0]
 
